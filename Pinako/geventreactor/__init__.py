@@ -1,8 +1,8 @@
 ## Twisted reactor running on gevent (libevent+greenlet)
 ##
 ## Copyright (C) 2011 by Jiang Yio <http://inportb.com/>
-## Please find instructions at <http://wiki.inportb.com/wiki/Projects:Python:Geventreactor>
-## The latest code is available at <https://gist.github.com/848058>
+## Please find instructions at
+##   <http://wiki.inportb.com/wiki/Projects:Python:Geventreactor>
 ##
 ## Permission is hereby granted, free of charge, to any person obtaining a copy
 ## of this software and associated documentation files (the "Software"), to deal
