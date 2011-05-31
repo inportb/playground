@@ -12,4 +12,4 @@ def nuke():
 				module.__dict__.clear()
 				break
 nuke()
-nuke = None
+del nuke # Much better than nuke = None
