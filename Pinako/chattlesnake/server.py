@@ -205,12 +205,12 @@ class IRCClient(object):
 				c = self.server.channel[target]
 				if self not in c.client:
 					raise IRCError.CannotSendToChan
-			except AttributeError:
+			except KeyError:
 				raise IRCError.NoSuchNick
 		else:
 			try:
 				c = self.server.client[target]
-			except AttributeError:
+			except KeyError:
 				raise IRCError.NoSuchNick
 		c.send(self.prefix,'%s %s %s'%(cmd,target,msg),exclude=self)
 	def do_nick(self,nick,*args):
