@@ -21,13 +21,4 @@ def checksumdir(dirname):
                 print files[i], "==", files[j] 
                 dups.append(files[j])
                 
-    if len(dups) > 0:
-        choice = raw_input("delete duplicates? [Y/N]").lower()
-        if choice == "y":
-            for f in dups:
-                os.remove(f)
-                print f, "deleted."
-    else:
-        print "No duplicates found!"
-
-    raw_input("Press enter to exit.")
+    return dups
