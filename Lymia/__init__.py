@@ -1,5 +1,5 @@
 def nuke():
-	import sys
+	import sys,imp
 
 	nukeList = ["Pwnna"]
 	modules  = sys.modules
@@ -11,5 +11,9 @@ def nuke():
 			if moduleName.startswith(prefix):
 				module.__dict__.clear()
 				break
+
+	for prefix in nukeList:
+		sys.modules[prefix] = imp.new_module(prefix)
+	
 nuke()
 del nuke # Much better than nuke = None
