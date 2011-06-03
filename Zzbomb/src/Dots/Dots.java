@@ -18,6 +18,7 @@ import com.jme3.math.Vector3f;
 import com.jme3.renderer.queue.RenderQueue.Bucket;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
+import com.jme3.scene.shape.Box;
 import com.jme3.scene.shape.Line;
 import com.jme3.scene.shape.Quad;
 
@@ -39,6 +40,9 @@ public class Dots extends SimpleApplication {
 	private static int LineCount = 0; // Permanent Storage Variable.
 	private static BitmapText hudText;
 	private static Vector3f reset = new Vector3f(1, 2, 3);
+	
+    private static Geometry guiPlayerTurnGeo;
+	
 	Material blue, green, red, yellow, white;
 
 	public static void main(String[] args) {
@@ -51,9 +55,7 @@ public class Dots extends SimpleApplication {
 	public void simpleInitApp() {
 		Node Board = new Node();
 		rootNode.attachChild(Board);
-
-		initCrossHairs();
-		initHud();
+		
 		flyCam.setMoveSpeed(4);
 		blue = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
 		blue.setColor("Color", new ColorRGBA(0, 0, 1, 0.4f));
@@ -74,7 +76,9 @@ public class Dots extends SimpleApplication {
 		white = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
 		white.setColor("Color", new ColorRGBA(1.0f, 1.0f, 1.0f, 0.50f));
 		white.getAdditionalRenderState().setBlendMode(BlendMode.Alpha);
-
+		
+		initHud();
+		
 		for (int i = 0; i < s; i++) {
 			for (int f = 0; f < s; f++) {
 				for (int k = 0; k < s; k++) {
@@ -92,18 +96,43 @@ public class Dots extends SimpleApplication {
 		}
 		pScore[0] = 0;
 		pScore[1] = 0;
-		
+		    
 		inputManager.addMapping("MouseDown", new MouseButtonTrigger(MouseInput.BUTTON_LEFT));
 		inputManager.addListener(actionListener, new String[] { "MouseDown" });
 	}
 
 	private void initHud() {
+		// CROSSHAIR
+		guiNode.detachAllChildren();
+		guiFont = assetManager.loadFont("Interface/Fonts/Default.fnt");
+		BitmapText ch = new BitmapText(guiFont, false);
+		ch.setSize(guiFont.getCharSet().getRenderedSize() * 2);
+		ch.setText("+"); // fake crosshairs :)
+		ch.setLocalTranslation(
+				// center
+				settings.getWidth() / 2 - guiFont.getCharSet().getRenderedSize() / 3 * 2,
+				settings.getHeight() / 2 + ch.getLineHeight() / 2, 0);
+		
+		// HUD TEXT
 		hudText = new BitmapText(guiFont, false);
 		hudText.setSize(guiFont.getCharSet().getRenderedSize()); // font size
 		hudText.setColor(ColorRGBA.Orange); // font color
-		updateHud();
-		hudText.setLocalTranslation(0, hudText.getHeight(), 0); // position
-		guiNode.attachChild(hudText);
+		
+		
+		// HUD PLAYER TURN
+		Quad guiPlayerTurnQuad = new Quad((settings.getWidth()/28), settings.getHeight() );
+		guiPlayerTurnGeo = new Geometry("PlayerTurn", guiPlayerTurnQuad);
+		guiPlayerTurnGeo.setMaterial(blue);		
+		
+		guiNode.attachChild(ch);
+	    guiNode.attachChild(hudText);
+		guiNode.attachChild(guiPlayerTurnGeo);
+
+	    updateHud();
+	    //guiNode.attachChild(guiPlayerTurnGeo);
+		hudText.setLocalTranslation(0, hudText.getHeight(), 0); // Repostition HudText for size.
+		guiPlayerTurnGeo.setLocalTranslation(settings.getWidth() - settings.getWidth()/28, 1, 1); // Reposition playerturnquad
+
 	}
 
 	private boolean CheckSelectedDistance() {
@@ -154,7 +183,16 @@ public class Dots extends SimpleApplication {
 		Line connect = new Line(selected[0], selected[1]);
 		connect.setLineWidth(20f);
 		Geometry line = new Geometry("Sky", connect);
-		line.setMaterial(blue);
+		if ( player == 0 ) {
+			line.setMaterial(blue);
+		}
+		else if ( player == 1 ) {
+			line.setMaterial(red);
+		}
+		else {
+			line.setMaterial(white);
+		}
+		
 		line.setQueueBucket(Bucket.Transparent);
 		rootNode.attachChild(line);
 		for (int i = 0; i < 2; i++) {
@@ -179,9 +217,16 @@ public class Dots extends SimpleApplication {
 		updateHud();
 	}
 
-	private void updateHud()
-	{
-		hudText.setText("Player 1: " + pScore[0] + "\nPlayer 2: " + pScore[1] + "\nLineCount: " + LineCount + "\nPlayer Turn: " + (player+1) );
+	private void updateHud() {
+		hudText.setText("Player Blue: " + pScore[0] + "\nPlayer Red: " + pScore[1] );
+		if ( player == 0 ) {
+			guiPlayerTurnGeo.setMaterial(blue);
+		} else if (player == 1 ) {
+			guiPlayerTurnGeo.setMaterial(red);
+		}
+		else {
+			guiPlayerTurnGeo.setMaterial(white);
+		}
 	}
 	
 	private ActionListener actionListener = new ActionListener() {
@@ -253,7 +298,6 @@ public class Dots extends SimpleApplication {
 	private void drawQuad(Vector3f a, Vector3f b, Vector3f a1, Vector3f b1) {
 		Quad quadshape = new Quad(1f, 1f);
 		Geometry quad = new Geometry("quad", quadshape);
-		Material mat_stl = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
 		quad.setMaterial(blue);
 		quad.setQueueBucket(Bucket.Transparent);
 		quad.setLocalTranslation(a);
@@ -312,19 +356,4 @@ public class Dots extends SimpleApplication {
 		}
 		return false;
 	}
-	
-	
-	protected void initCrossHairs() {
-		guiNode.detachAllChildren();
-		guiFont = assetManager.loadFont("Interface/Fonts/Default.fnt");
-		BitmapText ch = new BitmapText(guiFont, false);
-		ch.setSize(guiFont.getCharSet().getRenderedSize() * 2);
-		ch.setText("+"); // fake crosshairs :)
-		ch.setLocalTranslation(
-				// center
-				settings.getWidth() / 2 - guiFont.getCharSet().getRenderedSize() / 3 * 2,
-				settings.getHeight() / 2 + ch.getLineHeight() / 2, 0);
-		guiNode.attachChild(ch);
-	}
-
 }

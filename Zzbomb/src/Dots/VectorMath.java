@@ -38,27 +38,11 @@ public class VectorMath {
 					&& EuclideanDistance(a, a1) == EuclideanDistance(b, b1)) {
 				// Horizontal Lines
 				if (EuclideanDistance(a, a1) == 1.0 && EuclideanDistance(b, b1) == 1.0) {
-					/*
-					System.out.println(VectorMath.EuclideanDistance(a, a1) + " " + VectorMath.EuclideanDistance(a, b1));
-					System.out.println(VectorMath.EuclideanDistance(b, b1) + " " + VectorMath.EuclideanDistance(b, a1));
-					System.out.println("X: " + a.getX() + " X2: " + a1.getX() + "  X: " + b.getX() + " X2: " + b1.getX());
-					System.out.println("Y: " + a.getY() + " Y2: " + a1.getY() + "  Y: " + b.getY() + " Y2: " + b1.getY());
-					System.out.println("Z: " + a.getZ() + " Z2: " + a1.getZ() + "  Z: " + b.getZ() + " Z2: " + b1.getZ());
-					*/
 					return true;
-
 				}
 				// Vertical Lines
 				if (EuclideanDistance(a, b1) == 1.0 && EuclideanDistance(b, a1) == 1.0) {
-					
-					/*System.out.println(VectorMath.EuclideanDistance(a, a1) + " " + VectorMath.EuclideanDistance(a, b1));
-					System.out.println(VectorMath.EuclideanDistance(b, b1) + " " + VectorMath.EuclideanDistance(b, a1));
-					System.out.println("X: " + a.getX() + " X2: " + a1.getX() + "  X: " + b.getX() + " X2: " + b1.getX());
-					System.out.println("Y: " + a.getY() + " Y2: " + a1.getY() + "  Y: " + b.getY() + " Y2: " + b1.getY());
-					System.out.println("Z: " + a.getZ() + " Z2: " + a1.getZ() + "  Z: " + b.getZ() + " Z2: " + b1.getZ());
-					 */
 					return true;
-
 				}
 			}
 		}
@@ -66,9 +50,6 @@ public class VectorMath {
 	}
 	
 	public static boolean compareVectors(Vector3f a, Vector3f b) {
-		//printVector3f(a);
-		//printVector3f(b);
-		//System.out.println(" ");
 		if ( a.getX() == b.getX() && a.getY() == b.getY() && a.getZ() == b.getZ() ) {
 			return true;
 		}
