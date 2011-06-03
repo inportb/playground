@@ -10,12 +10,14 @@ Requires PyCrypto.
 Usage
 -----
 
-    include tbcrypt
+```python
+include tbcrypt
+```
 
 Notes
 -----
 
-The included tool *traceback_decoder* decodes the encrypted tracebacks
+The included tool `traceback_decoder` decodes the encrypted tracebacks
 as long as the correct key is given. Try it out on the included
-*example_traceback* traceback generated from (the also included)
-*test.py*.
+`example_traceback` traceback generated from (the also included)
+`test.py`.
