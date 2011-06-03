@@ -1,3 +1,7 @@
+#!/usr/bin/env python
+# Licensed under a license similar to the FreeBSD license. See COPYING
+# included with this file for more information.
+
 from optparse import OptionParser
 from Crypto.PublicKey import RSA
 import sys
