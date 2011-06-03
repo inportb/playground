@@ -4,14 +4,7 @@ Utility functions for roughly finding areas under graphical curves.
 
 """
 
-def _function():
-	"""Placeholder function.
-
-	Used for type comparisons only. Feel free to ignore, but do not modify.
-
-	"""
-	pass
-
+from types import LongType, FloatType, MethodType, IntType
 
 def integrate(b, a, y, ords):
 	"""Trapezium/trapezoidal integration
@@ -28,10 +21,10 @@ def integrate(b, a, y, ords):
 	"""
 	
 	# Real programmers use type checks!
-	assert type(b) is int, "b is not an integer number!"
-	assert type(a) is int, "a is not an integer number!"
-	assert type(y) is type(_function), "y is not a function or lambda!"
-	assert type(ords) is int, "ords is not an integer number!"
+	assert type(b) is IntType or type(b) is LongType, "b is not an integer number!"
+	assert type(a) is IntType or type(a) is LongType, "a is not an integer number!"
+	assert type(y) is MethodType, "y is not a function or lambda!"
+	assert type(ords) is IntType or type(ords) is LongType, "ords is not an integer number!"
 
 	# There is nothing immediatly wrong with these but they may lead to oddities.
 	assert b > a, "Start (a) cannot have a larger value than the end (b)!"
@@ -40,7 +33,7 @@ def integrate(b, a, y, ords):
 	# Make sure this is a usable function for our purposes
 	# b is used because any constant used may not be in the valid
 	# range for the function provided.
-	assert type(y(b)) is int or type(y(b)) is float, "y is not a usable function (it doesn't return a number)!"
+	assert type(y(b)) is IntType or type(y(b)) is FloatType or type(y(b)) is LongType, "y is not a usable function (it doesn't return a number)!"
 	
 	n = ords - 1 # number of 'strips'
 	h = (b - a) / float(n) # work out the height of every trapezium
