@@ -1,0 +1,3 @@
+import tbcrypt
+
+raise Exception

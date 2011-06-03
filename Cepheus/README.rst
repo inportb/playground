@@ -1,4 +1,9 @@
 Oh my! It's Ceph3us' little portion of the world.
 =================================================
 
-It's currently feeling unloved in here... maybe that will change soon :(
+Projects
+--------
+
+*TBCrypt*
+
+A (completly useless) script for encrypting Python tracebacks with RSA keys.
