@@ -1,25 +1,7 @@
 def nuke():
-<<<<<<< HEAD
-	import sys,imp
-
-	nukeList = ["Pwnna"]
-	modules  = sys.modules
-	for moduleName in modules:
-		module = modules[moduleName]
-		if module==None:
-			continue
-		for prefix in nukeList:
-			if moduleName.startswith(prefix):
-				module.__dict__.clear()
-				break
-
-	for prefix in nukeList:
-		sys.modules[prefix] = imp.new_module(prefix)
-	
-=======
 	import sys,imp,os,os.path
+	debug = True
 	nukeList = ["Pwnna"]
-	debug = False
 	def nukeMain():
 		modules  = sys.modules
 		for moduleName in modules:
@@ -51,7 +33,5 @@ def nuke():
 	nukeMain()
 	for prefix in nukeList:
 		blockRecurse(prefix,prefix)
-
->>>>>>> 81d4c81de8e0f711d12c38b3c361d6da8d638295
 nuke()
-del nuke # Much better than nuke = None
+del nuke
