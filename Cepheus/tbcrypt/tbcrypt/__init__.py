@@ -1,5 +1,12 @@
-# encrypt tracebacks. entirely useless but works.
-# requires pycrypto.
+#!/usr/bin/env python
+# Licensed under a license similar to the FreeBSD license. See COPYING
+# included with this file for more information.
+"""tbcrypt
+
+Encrypt tracebacks. Entirely useless but works.
+Requires pycrypto.
+"""
+
 from Crypto.PublicKey import RSA
 from Crypto.Random import random
 import sys 
