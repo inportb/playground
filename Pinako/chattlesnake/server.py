@@ -526,13 +526,16 @@ class IRCClientProxy(object):
 		self.via.notify('client_send',self.serverprefix,self.name,msg)
 
 class IRCNodeHandler(ClusterHandler):
-	def net_client_connect(self,(serverprefix,name,ctime)):
+	def __init__(self,protocol):
+		ClusterHandler.__init__(self,protocol)
+		self.server = self.node.server
+	def net_client_connect(self,serverprefix,name,ctime):
 		return self.server.client_connect(serverprefix,name,ctime)
-	def net_client_disconnect(self,(serverprefix,name)):
+	def net_client_disconnect(self,serverprefix,name):
 		return self.server.client_disconnect(serverprefix,name)
-	def net_client_register(self,(serverprefix,name,username,hostname,realname,usermode)):
+	def net_client_register(self,serverprefix,name,username,hostname,realname,usermode):
 		return self.server.client_register(serverprefix,name,username,hostname,realname,usermode)
-	def net_client_send(self,(serverprefix,name,msg)):
+	def net_client_send(self,serverprefix,name,msg):
 		return self.server.client_send(serverprefix,name,msg)
 
 class IRCNode(NetworkNode):
@@ -590,19 +593,19 @@ class IRCServer(object):
 			self.data[lname] = c
 		else:
 			raise KeyError
-		self.node.notify('client_register',(self.prefix,c.name,c.username,c.hostname,c.realname,c.usermode))
+		self.node.notify_all('client_register',self.prefix,c.name,c.username,c.hostname,c.realname,c.usermode)
 	def client_connect(self,serverprefix,name,ctime):
 		lname = name.lower()
 		now = time.time()
 		self.data[lname] = None
 		self.cur.execute('INSERT INTO client (name,nick,node,ctime) VALUES (?,?,?,?)',(name.lower(),name,serverprefix,ctime))
-		self.node.notify('client_connect',(serverprefix,name,ctime))
+		self.node.notify_all('client_connect',serverprefix,name,ctime)
 		print '+',serverprefix,name,ctime
 	def client_register(self,serverprefix,name,username,hostname,realname,usermode,exclude=None):
 		if serverprefix != self.prefix:
 			self.data[name.lower()] = IRCClientProxy(self,self.peer[serverprefix],serverprefix,name,username,hostname,realname,usermode)
 	def client_remove(self,name):
-		self.node.notify('client_disconnect',(self.prefix,name))
+		self.node.notify_all('client_disconnect',self.prefix,name)
 		self.client_disconnect(self.prefix,name)
 	def client_disconnect(self,serverprefix,name,exclude=None):
 		lname = name.lower()
@@ -621,7 +624,7 @@ class IRCServer(object):
 			except KeyError:
 				pass
 		else:
-			self.node.notify('client_send',(serverprefix,name,msg))
+			self.node.notify_all('client_send',serverprefix,name,msg)
 	def serve(self,listener,backlog=None,spawn='default'):
 		return StreamServer(listener,handle=self.handle,backlog=backlog,spawn=spawn)
 	def handle(self,sock,addr):

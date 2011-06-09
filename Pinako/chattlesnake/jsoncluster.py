@@ -19,23 +19,29 @@ class ClusterHandler(BaseHandler):
 	def do_netstartup(self,uid,edges):
 		self.uid = uid
 		self.node.add(self,edges)
-	def do_net(self,method,params,src,dst=None,block=False):
+	def do_net(self,dst,block,method,params):
 		node = self.node
 		uid = node.uid
 		res = {}
-		if dst is None or dst == uid:
+		inc = False
+		try:
+			if uid in dst:
+				inc = True
+		except:
+			pass
+		if dst is None or inc:
 			try:
 				h = getattr(self,'net_'+method)
-				res[uid] = h(params)
+				res[uid] = h(*params)
 			except GreenletExit:
 				return
 			except:
 				pass
-		if dst is None or dst != uid:
+		if dst is None or not inc:
 			if block:
-				job = node.call(method,params,src,dst,exclude=self.uid)
+				job = node.call(dst,self.uid,method,*params)
 			else:
-				node.notify(method,params,src,dst,exclude=self.uid)
+				node.notify(dst,self.uid,method,*params)
 				job = None
 		if block:
 			if job is not None:
@@ -59,7 +65,7 @@ class NetworkNode(object):
 	def add(self,peer,edges):
 		self.peer[peer.uid] = peer
 		edges.append((self.uid,peer.uid))
-		self.notify('connect',edges)
+		self.notify_all('connect',edges)
 		self.connect(edges)
 	def connect(self,edges):
 		self.graph.add_edges_from(edges)
@@ -72,22 +78,41 @@ class NetworkNode(object):
 		else:
 			edges = ((self.uid,peer.uid),)
 			self.disconnect(edges)
-			self.notify('disconnect',edges)
+			self.notify_all('disconnect',edges)
 	def disconnect(self,edges):
 		self.graph.remove_edges_from(edges)
 		self.maketree(prune=True)
-	def call(self,method,params,src=None,dst=None,exclude=None):
-		if src is None:
-			src = self.uid
+	def call(self,dst,exc,method,*params):
 		peer = self.peer
-		return [spawn(peer[via].call,'net',method,params,src,dst,True) for via in self.via if via != exclude]
-	def notify(self,method,params,src=None,dst=None,exclude=None):
-		if src is None:
-			src = self.uid
+		if dst is None:
+			return [spawn(peer[via].call,'net',dst,True,method,params) for via in self.via if via != exc]
+		else:
+			route = self.route
+			dst = tuple(k for k in dst if k != exc and k in route)
+			return [spawn(peer[route[k]].call,'net',dst,True,method,params) for k in dst]
+	def notify(self,dst,exc,method,*params):
 		peer = self.peer
-		for via in self.via:
-			if via != exclude:
-				peer[via].notify('net',method,params,src,dst,False)
+		if dst is None:
+			for via in self.via:
+				if via != exc:
+					peer[via].notify('net',dst,False,method,params)
+		else:
+			route = self.route
+			dst = tuple(k for k in dst if k != exc and k in route)
+			for k in dst:
+				peer[route[k]].notify('net',dst,False,method,params)
+	def call_one(self,dst,method,*params):
+		return self.call([dst],None,method,*params)
+	def notify_one(self,method,*params):
+		return self.notify([dst],None,method,*params)
+	def call_some(self,dst,method,*params):
+		return self.call(dst,None,method,*params)
+	def notify_some(self,dst,method,*params):
+		return self.notify(dst,None,method,*params)
+	def call_all(self,method,*params):
+		return self.call(None,None,method,*params)
+	def notify_all(self,method,*params):
+		return self.notify(None,None,method,*params)
 	def maketree(self,prune=False):
 		try:
 			self.tree = tree = networkx.minimum_spanning_tree(self.graph)
