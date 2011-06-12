@@ -191,7 +191,7 @@ if __name__ == "__main__":
     password = raw_input("Password: ")
     board = int(raw_input("Board ID: "))
     
-    smf = SMFService(url, user, password)
+    smf = SMFService(url, user, password, "")
     t = ""
     i = 0
     timeTaken = time.time() - smf.initTime
@@ -202,6 +202,7 @@ if __name__ == "__main__":
         timeTaken += (time.time() - timeInterval)
         t = raw_input("Press any key to continue or x to quit.")
         timeInterval = time.time()
+        time.sleep(5)
         
     smf.output("Time taken: %.1f seconds for %d posts" % (timeTaken, i))
     raw_input("press enter to exit...")

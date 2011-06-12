@@ -26,6 +26,6 @@ class CoolTurtle(TurtleWorld.Turtle):
 if __name__ == "__main__":
     world = TurtleWorld.TurtleWorld(interactive=False)
     t = CoolTurtle()
-    t.drawCircle(10)
+    t.drawCircle(100)
     t.redraw()
     world.wait_for_user()
