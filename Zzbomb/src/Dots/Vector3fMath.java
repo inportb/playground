@@ -7,7 +7,7 @@ import com.jme3.math.Vector3f;
  * @version 1.0
  * @since 1.6
  */
-public class VectorMath {
+public class Vector3fMath {
 
 	/**
 	 * Determine distance between two points
