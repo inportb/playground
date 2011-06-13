@@ -1,7 +1,10 @@
 package Dots;
-// Just testing
+
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import Dots.Dot;
+import Dots.Vector3fMath;
 
 import com.jme3.app.SimpleApplication;
 import com.jme3.collision.CollisionResult;
@@ -18,45 +21,50 @@ import com.jme3.math.Vector3f;
 import com.jme3.renderer.queue.RenderQueue.Bucket;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
-import com.jme3.scene.shape.Box;
 import com.jme3.scene.shape.Line;
 import com.jme3.scene.shape.Quad;
 
-import Dots.VectorMath;
-
 public class Dots extends SimpleApplication {
+	// Initial Parameters
+	static int s = 4; // How large should the grid be?
+	private int playerCount = 2; // How many players are there?
 
-	private static int s = 4; // How large should the grid be?
-	private static int selectCount = 0; // Temporary Storage Variable
+	// Secondary Parameters
 	Vector3f[] selected = new Vector3f[2];
 	private static Dot grid[][][] = new Dot[s][s][s];
-	private  int player = 0;
-	private  int playerCount = 2;
-	private  int pScore[] = new int[playerCount];
-	private static Vector3f Lines[][] = new Vector3f[s * s * s * 6][2]; // Vector
-																		// containing
-																		// line
-																		// archive
-	private static int LineCount = 0; // Permanent Storage Variable.
+	private int player = 0; // Current Players Turn.
+	private static int LineCount = 0; // Total Count of Lines Played in Game.
+
+	// Storage Variables
+	private static int selectCount = 0; // Temporary Storage Variable
+	private static Vector3f Lines[][] = new Vector3f[s * s * s * 6][2]; // LinesArchive
+	private int pScore[] = new int[playerCount];
+
+	// Hud Variables for updating.
 	private static BitmapText hudText;
-	private static Vector3f reset = new Vector3f(1, 2, 3);
-	
-    private static Geometry guiPlayerTurnGeo;
-	
+	private static Geometry HudPlayerTurnGeo;
+
+	// Global Colors
 	Material blue, green, red, yellow, white;
 
+	// Find a way to not need this...
+	private static Vector3f reset = new Vector3f(1, 2, 3);
+
 	public static void main(String[] args) {
-		Logger.getLogger("").setLevel(Level.SEVERE);
+		Logger.getLogger("").setLevel(Level.SEVERE); // Stop JME3 Outputs
 		Dots app = new Dots();
 		app.start();
 	}
-	
+
+	// Initializes the App
 	@Override
 	public void simpleInitApp() {
-		Node Board = new Node();
-		rootNode.attachChild(Board);
-		
-		flyCam.setMoveSpeed(4);
+		Node Board = new Node(); // Create 3d Plane
+		rootNode.attachChild(Board); // Attach 3d Plan to rootNode
+
+		flyCam.setMoveSpeed(4); // Increase camera movement speed.
+
+		// Configure Colors, with Semi-Transparency.
 		blue = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
 		blue.setColor("Color", new ColorRGBA(0, 0, 1, 0.4f));
 		blue.getAdditionalRenderState().setBlendMode(BlendMode.Alpha);
@@ -76,33 +84,41 @@ public class Dots extends SimpleApplication {
 		white = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
 		white.setColor("Color", new ColorRGBA(1.0f, 1.0f, 1.0f, 0.50f));
 		white.getAdditionalRenderState().setBlendMode(BlendMode.Alpha);
-		
+
+		// Initialize the game heads up display.
 		initHud();
-		
+
+		// Initialize the grid.
 		for (int i = 0; i < s; i++) {
 			for (int f = 0; f < s; f++) {
 				for (int k = 0; k < s; k++) {
-					grid[i][f][k] = new Dot(i, f, k, s);
-					grid[i][f][k].setX(i);
-					grid[i][f][k].setY(f);
-					grid[i][f][k].setZ(k);
-					grid[i][f][k].getSphere().setMaterial(white);
-
-					grid[i][f][k].getSphere().setQueueBucket(Bucket.Transparent);
-					Board.attachChild(grid[i][f][k].getSphere());
-					grid[i][f][k].getSphere().setLocalTranslation(grid[i][f][k].getLoc());
+					grid[i][f][k] = new Dot(i, f, k); // Create a dot
+					grid[i][f][k].getSphere().setMaterial(white); // Set the
+					// dot's
+					// material
+					grid[i][f][k].getSphere()
+							.setQueueBucket(Bucket.Transparent); // transparency
+					Board.attachChild(grid[i][f][k].getSphere()); // Attach dot
+					// to board
+					grid[i][f][k].getSphere().setLocalTranslation(
+							grid[i][f][k].getLoc()); // Set location of dot
 				}
 			}
 		}
-		pScore[0] = 0;
-		pScore[1] = 0;
-		    
-		inputManager.addMapping("MouseDown", new MouseButtonTrigger(MouseInput.BUTTON_LEFT));
+
+		// Reset Player Scores for new game
+		for (int i = 0; i < playerCount; i++) {
+			pScore[i] = 0;
+		}
+
+		inputManager.addMapping("MouseDown", new MouseButtonTrigger(
+				MouseInput.BUTTON_LEFT));
 		inputManager.addListener(actionListener, new String[] { "MouseDown" });
 	}
 
+	// Initialized the HUD
 	private void initHud() {
-		// CROSSHAIR
+		// CROSSHAIRS
 		guiNode.detachAllChildren();
 		guiFont = assetManager.loadFont("Interface/Fonts/Default.fnt");
 		BitmapText ch = new BitmapText(guiFont, false);
@@ -110,125 +126,52 @@ public class Dots extends SimpleApplication {
 		ch.setText("+"); // fake crosshairs :)
 		ch.setLocalTranslation(
 				// center
-				settings.getWidth() / 2 - guiFont.getCharSet().getRenderedSize() / 3 * 2,
+				settings.getWidth() / 2
+						- guiFont.getCharSet().getRenderedSize() / 3 * 2,
 				settings.getHeight() / 2 + ch.getLineHeight() / 2, 0);
-		
+
 		// HUD TEXT
 		hudText = new BitmapText(guiFont, false);
 		hudText.setSize(guiFont.getCharSet().getRenderedSize()); // font size
 		hudText.setColor(ColorRGBA.Orange); // font color
-		
-		
-		// HUD PLAYER TURN
-		Quad guiPlayerTurnQuad = new Quad((settings.getWidth()/28), settings.getHeight() );
-		guiPlayerTurnGeo = new Geometry("PlayerTurn", guiPlayerTurnQuad);
-		guiPlayerTurnGeo.setMaterial(blue);		
-		
-		guiNode.attachChild(ch);
-	    guiNode.attachChild(hudText);
-		guiNode.attachChild(guiPlayerTurnGeo);
 
-	    updateHud();
-	    //guiNode.attachChild(guiPlayerTurnGeo);
-		hudText.setLocalTranslation(0, hudText.getHeight(), 0); // Repostition HudText for size.
-		guiPlayerTurnGeo.setLocalTranslation(settings.getWidth() - settings.getWidth()/28, 1, 1); // Reposition playerturnquad
+		// HUD PLAYER BAR
+		Quad guiPlayerTurnQuad = new Quad((settings.getWidth() / 28), settings
+				.getHeight());
+		HudPlayerTurnGeo = new Geometry("PlayerTurn", guiPlayerTurnQuad);
+		HudPlayerTurnGeo.setMaterial(blue);
 
-	}
+		guiNode.attachChild(ch); // Attach Crosshairs
+		guiNode.attachChild(hudText); // Attach HudText
+		guiNode.attachChild(HudPlayerTurnGeo); // Attach PlayerTurnGeo
 
-	private boolean CheckSelectedDistance() {
-		if (VectorMath.EuclideanDistance(selected[0], selected[1]) <= 1) {
-			return true;
-		} else {
-			return false;
-		}
-	}
-
-	private void chknear(int x, int y, int z) {
-		float xf = x;
-		float yf = y;
-		float zf = z;
-
-		// Is one already selected? Is the 2nd point within clicking distance?
-		if (selectCount > 1 && CheckSelectedDistance() == true) {
-
-			// X
-
-			if (selected[0].getX() == xf - 1) {
-				drawConnector(new Vector3f((float) (xf + 0.40), yf, zf));
-
-			} else if (selected[0].getX() == xf + 1) {
-				drawConnector(new Vector3f((float) (xf - 0.40), yf, zf));
-			}
-
-			// Y
-
-			else if (selected[0].getY() == yf + 1) {
-				drawConnector(new Vector3f(xf, (float) (yf + 0.40), zf));
-			} else if (selected[0].getY() == yf - 1) {
-				drawConnector(new Vector3f(xf, (float) (yf - 0.40), zf));
-			}
-
-			// Z
-
-			else if (selected[0].getZ() == zf + 1) {
-				drawConnector(new Vector3f(xf, yf, (float) (zf + 0.40)));
-			} else if (selected[0].getZ() == zf - 1) {
-				drawConnector(new Vector3f(xf, yf, (float) (zf - 0.40)));
-			}
-
-		}
-	}
-
-	private void drawConnector(Vector3f loc) {
-		Line connect = new Line(selected[0], selected[1]);
-		connect.setLineWidth(20f);
-		Geometry line = new Geometry("Sky", connect);
-		if ( player == 0 ) {
-			line.setMaterial(blue);
-		}
-		else if ( player == 1 ) {
-			line.setMaterial(red);
-		}
-		else {
-			line.setMaterial(white);
-		}
-		
-		line.setQueueBucket(Bucket.Transparent);
-		rootNode.attachChild(line);
-		for (int i = 0; i < 2; i++) {
-			SetSphereColor(selected[i], "white");
-		}
-		// Wow. Ok so the connector was just drawn. Its time to figure out if we
-		// need to draw anything else....
-		Lines[LineCount][0] = selected[0];
-		Lines[LineCount][1] = selected[1];
-		LineCount++;
-		if ( CheckSquare(selected, Lines, LineCount, s) ) {
-			System.out.println("Lol a square exists");
-			pScore[player]++;
-		}
-		// Update who's turn it is now that the line has been drawn.
-		if ( player < playerCount-1 ) {
-			player++;
-		}
-		else {
-			player = 0;
-		}
 		updateHud();
+		hudText.setLocalTranslation(0, hudText.getHeight(), 0); // Repostition
+		// HudText for
+		// size.
+		HudPlayerTurnGeo.setLocalTranslation(settings.getWidth()
+				- settings.getWidth() / 28, 1, 1); // Reposition playerturnquad
+
 	}
 
+	// Refreshes the HUD with latest data.
 	private void updateHud() {
-		hudText.setText("Player Blue: " + pScore[0] + "\nPlayer Red: " + pScore[1] );
-		if ( player == 0 ) {
-			guiPlayerTurnGeo.setMaterial(blue);
-		} else if (player == 1 ) {
-			guiPlayerTurnGeo.setMaterial(red);
-		}
-		else {
-			guiPlayerTurnGeo.setMaterial(white);
+		hudText.setText("Player Blue: " + pScore[0] + "\nPlayer Red: "
+				+ pScore[1]); // Update Text
+		// Update Player indicator
+		if (player == 0) {
+			HudPlayerTurnGeo.setMaterial(blue);
+		} else if (player == 1) {
+			HudPlayerTurnGeo.setMaterial(red);
+		} else {
+			// This should not be possible. But will currently happen if there
+			// are more then 2 players. Failsafe.
+			HudPlayerTurnGeo.setMaterial(white);
+			System.out
+					.println("Woa. Too many players. Dots has not been programmed for more then two yet.");
 		}
 	}
-	
+
 	private ActionListener actionListener = new ActionListener() {
 		public void onAction(String name, boolean keyPressed, float tpf) {
 			if (name.equals("MouseDown") && !keyPressed) {
@@ -243,97 +186,139 @@ public class Dots extends SimpleApplication {
 					// The closest collision point is what was truly hit:
 					CollisionResult closest = results.getClosestCollision();
 
-					int tmpx = (int) closest.getGeometry().getLocalTranslation().getX();
-					int tmpy = (int) closest.getGeometry().getLocalTranslation().getY();
-					int tmpz = (int) closest.getGeometry().getLocalTranslation().getZ();
-
-					if (selectCount < 2) {
-						selected[selectCount] = new Vector3f(tmpx, tmpy, tmpz);
-						if ( LineExist(selected[0], selected[1], Lines, LineCount) == false  ) {
+					int tmpx = (int) closest.getGeometry()
+							.getLocalTranslation().getX();
+					int tmpy = (int) closest.getGeometry()
+							.getLocalTranslation().getY();
+					int tmpz = (int) closest.getGeometry()
+							.getLocalTranslation().getZ();
+					
+						/*
+						 * 1. On First selection.
+						 * 		A. Make selected dot yellow
+						 * 2. On Second selection.
+						 * 		A. Can a line exist there? - No? Reset Selection Process
+						 *		B. Does a line already exist there? - Yes? Reset Selection Process
+						 *		C. Everything checks out. Draw the line.
+						 *			1. Was a square completed? - No? Change Players
+						 *			2. Yes? Dont change players, increase current player score by 1.
+						 * 3. Reset Selections
+						 **/
+					
+					if (selectCount == 0 )	{
+						selected[0] = new Vector3f(tmpx, tmpy, tmpz); // First selection made.
+						SetSphereColor(selected[0], "yellow"); // Set to yellow.
+						selectCount++;
+					} else if ( selectCount == 1 ) {
+						selected[1] = new Vector3f(tmpx,tmpy,tmpz); // Second selection made.
+						// Only accept this selection if a line does not already exist there. AND distance is ok.
+						if (LineExist(selected[0], selected[1], Lines,
+								LineCount) == false && Vector3fMath.EuclideanDistance(selected[0], selected[1]) <= 1 ) {
 							selectCount++;
 						}
 						else {
-							resetSelected();
+							resetSelections();
 						}
 					} else {
-						selectCount = 0;
-						for (int i = 0; i < 2; i++) {
-							SetSphereColor(selected[i],"white");
-							selected[i] = reset;
-						}
-
-						selected[selectCount] = new Vector3f(tmpx, tmpy, tmpz);
+						resetSelections();
 					}
-					if (selectCount > 0 && selectCount <= 2) {
-						if (selectCount == 1) {
-							// First Selection.
-							SetSphereColor(selected[0], "yellow");
-						} else if (selectCount == 2) {
-							// Second Selection
-							if (CheckSelectedDistance()) {
-								SetSphereColor(selected[1], "yellow");
-							} else {
-								SetSphereColor(selected[0], "white");
-								selected[0] = reset;
-							}
-
-							chknear((int) selected[1].getX(), (int) selected[1].getY(), (int) selected[1].getZ());
-							resetSelected();
+					
+					// If two selection have been properly made.. Time to do some fun stuff.
+					if ( selectCount == 2 ) {
+						drawPrep(); // Draws the line.
+						
+						// Record lines in archive.
+						Lines[LineCount][0] = selected[0];
+						Lines[LineCount][1] = selected[1];
+						LineCount++;
+						
+						// Check for a square!
+						if ( CheckForSquare(selected, Lines, LineCount) ) {
+							pScore[player]++; // Nifty that player got a square. Give them a point
+						} 
+						// If a square was not scored, player needs to be changed. This will work with more then 2 players.
+						else if ( player < playerCount-1 ) {
+							player++;
+						} else { 
+							player = 0;
 						}
+						updateHud(); // Update HUD for any point changes and such.
+						resetSelections(); // Next selection can be made.
 					}
 				}
 			}
 		}
 	};
+	
+	// Determine how and where to draw the line.
+	// This is for up/down/left/right offsets and nonsuch.
+	private void drawPrep() {
+		if (selected[0].getX() == selected[1].getX() - 1) {
+			drawConnector(new Vector3f((float) (selected[1].getX() + 0.40), selected[1].getY(), selected[1].getZ() ));
 
-	private void resetSelected () {
-		selectCount = 0;
-		SetSphereColor(selected[0], "white");
-		SetSphereColor(selected[1], "white");
-		selected[0] = reset;
-		selected[1] = reset;
-		
+		} else if (selected[0].getX() == selected[1].getX() + 1) {
+			drawConnector(new Vector3f((float) (selected[1].getX() - 0.40), selected[1].getY(), selected[1].getZ() ));
+		}
+
+		// Y
+
+		else if (selected[0].getY() == selected[1].getY() + 1) {
+			drawConnector(new Vector3f(selected[1].getX(), (float) (selected[1].getY() + 0.40), selected[1].getZ()));
+		} else if (selected[0].getY() == selected[1].getY() - 1) {
+			drawConnector(new Vector3f(selected[1].getX(), (float) (selected[1].getY() - 0.40), selected[1].getZ()));
+		}
+
+		// Z
+
+		else if (selected[0].getZ() == selected[1].getZ() + 1) {
+			drawConnector(new Vector3f(selected[1].getX(), selected[1].getY(), (float) (selected[1].getZ() + 0.40)));
+		} else if (selected[0].getZ() == selected[1].getZ() - 1) {
+			drawConnector(new Vector3f(selected[1].getX(), selected[1].getY(), (float) (selected[1].getZ() - 0.40)));
+		}
 	}
 	
-	private void drawQuad(Vector3f a, Vector3f b, Vector3f a1, Vector3f b1) {
-		Quad quadshape = new Quad(1f, 1f);
-		Geometry quad = new Geometry("quad", quadshape);
-		quad.setMaterial(blue);
-		quad.setQueueBucket(Bucket.Transparent);
-		quad.setLocalTranslation(a);
-		rootNode.attachChild(quad);
+	// Draws the line.
+	private void drawConnector(Vector3f loc) {
+		Line connect = new Line(selected[0], selected[1]);
+		connect.setLineWidth(20f);
+		Geometry line = new Geometry("Sky", connect);
+		if ( player == 0 ) {
+			line.setMaterial(blue);
+		} else if ( player == 1 ) {
+			line.setMaterial(red);
+		} else {
+			line.setMaterial(white);
+			// Currently not setup for more then two players.
+		}
+		line.setQueueBucket(Bucket.Transparent);
+		rootNode.attachChild(line);
 	}
-
-	protected void SetSphereColor(Vector3f vector, String color) {
+	
+	// Set the color of a specified dot.
+	private void SetSphereColor(Vector3f vector, String color) {
 		if (color == "yellow") {
-			grid[(int) vector.getX()][(int) vector.getY()][(int) vector.getZ()].getSphere().setMaterial(yellow);
+			grid[(int) vector.getX()][(int) vector.getY()][(int) vector.getZ()]
+					.getSphere().setMaterial(yellow);
 		} else if (color == "white") {
-			grid[(int) vector.getX()][(int) vector.getY()][(int) vector.getZ()].getSphere().setMaterial(white);
+			grid[(int) vector.getX()][(int) vector.getY()][(int) vector.getZ()]
+					.getSphere().setMaterial(white);
 		}
 
 	}
-
-	public boolean CheckSquare(Vector3f[] Selected, Vector3f[][] Lines, int LineCount, int s) {
-		if (CheckForSquare(Selected[0], Selected[1], Lines, LineCount)) {
-			return true;
-		}
-		else {
-			return false;
-		}
-	}
+	
 
 	/*
 	 * Determine if a square exists in in the Lines array based on two initial points.
 	 */
-	private boolean CheckForSquare(Vector3f a, Vector3f b, Vector3f[][] Lines, int LineCount) {
+	private boolean CheckForSquare(Vector3f[] Selected, Vector3f[][] Lines, int LineCount) {
 		for (int i = 0; i < LineCount; i++) {
 			// Compare the selected line against all lines in the Lines array.
 			// True if it finds a parallel line one away.
-			if (VectorMath.isParallel(a, b, Lines[i][0], Lines[i][1])) {	
-				if (LineExist(a, Lines[i][0], Lines, LineCount) && LineExist(b, Lines[i][1], Lines, LineCount)) {
+			if (Vector3fMath.isParallel(Selected[0], Selected[1], Lines[i][0], Lines[i][1])) {	
+				if (LineExist(Selected[0], Lines[i][0], Lines, LineCount) && LineExist(Selected[1], Lines[i][1], Lines, LineCount)) {
 					return true;
 				}
-				if (LineExist(a, Lines[i][1], Lines, LineCount) && LineExist(b, Lines[i][0], Lines, LineCount)) {
+				if (LineExist(Selected[0], Lines[i][1], Lines, LineCount) && LineExist(Selected[1], Lines[i][0], Lines, LineCount)) {
 					return true;
 				}
 				
@@ -347,13 +332,20 @@ public class Dots extends SimpleApplication {
 	 */
 	private static boolean LineExist(Vector3f a, Vector3f b, Vector3f[][] Lines, int LineCount) {
 		for ( int i = 0; i < LineCount; i++ ) {
-			if ( VectorMath.compareVectors(Lines[i][0], a) && VectorMath.compareVectors(Lines[i][1], b) ) {
+			if ( Vector3fMath.compareVectors(Lines[i][0], a) && Vector3fMath.compareVectors(Lines[i][1], b) ) {
 				return true;
 			}
-			if ( VectorMath.compareVectors(Lines[i][0], b) && VectorMath.compareVectors(Lines[i][1], a) ) {
+			if ( Vector3fMath.compareVectors(Lines[i][0], b) && Vector3fMath.compareVectors(Lines[i][1], a) ) {
 				return true;
 			}
 		}
 		return false;
+	}
+	
+	private void resetSelections() {
+		 	selectCount = 0;
+			SetSphereColor(selected[0], "white");
+			selected[0] = reset;
+			selected[1] = reset;
 	}
 }
