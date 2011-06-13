@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# Licensed under a license similar to the FreeBSD license. See COPYING
+# included with this file for more information.
 """Trapeze
 
 Utility functions for roughly finding areas under graphical curves.

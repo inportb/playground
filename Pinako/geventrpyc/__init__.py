@@ -25,6 +25,7 @@
 ## OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 ## THE SOFTWARE.
 
+import sys, logging
 from gevent import socket, spawn
 try:
 	from gevent import ssl
@@ -35,10 +36,11 @@ from rpyc.core import VoidService
 from rpyc.core.stream import SocketStream as BaseSocketStream
 from rpyc.utils.server import Server
 from rpyc.utils.factory import connect_stream, _get_free_port
+from rpyc.utils.registry import UDPRegistryClient
 
 class SocketStream(BaseSocketStream):
 	@classmethod
-	def _connect(cls,host,port,family=socket.AF_INET,socktype=socket.SOCK_STREAM,proto=0,timeout=3,nodelay=False):
+	def _connect(cls,host='0.0.0.0',port=0,family=socket.AF_INET,socktype=socket.SOCK_STREAM,proto=0,timeout=3,nodelay=False):
 		s = socket.socket(family,socktype,proto)
 		s.settimeout(timeout)
 		s.connect((host,port))
@@ -64,8 +66,55 @@ class TunneledSocketStream(SocketStream):
 			self.tun.close()
 
 class GeventServer(Server):
+	def __init__(self,service,hostname='',ipv6=False,port=0,backlog=10,reuse_addr=True,authenticator=None,registrar=None,auto_register=False,protocol_config={},logger=None,listener=None):
+		self.active = False
+		self._closed = False
+		self.service = service
+		self.authenticator = authenticator
+		self.backlog = backlog
+		self.auto_register = bool(registrar)
+		self.protocol_config = protocol_config
+		self.clients = set()
+		if listener is None:
+			if ipv6:
+				if hostname == 'localhost' and sys.platform != 'win32':
+					hostname = 'localhost6'
+				self.listener = socket.socket(socket.AF_INET6,socket.SOCK_STREAM)
+			else:
+				self.listener = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+			if reuse_addr and sys.platform != 'win32':
+				self.listener.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+			self.listener.bind((hostname,port))
+		else:
+			self.listener = listener
+		self.sockname = self.listener.getsockname()
+		if logger is None:
+			if isinstance(self.sockname,tuple):
+				logger = logging.getLogger('%s:%d'%(self.service.get_service_name(),self.sockname[1]))
+			else:
+				logger = logging.getLogger('%s:%d'%(self.service.get_service_name(),self.sockname))
+		self.logger = logger
+		if registrar is None:
+			registrar = UDPRegistryClient(logger=self.logger)
+		self.registrar = registrar
 	def _accept_method(self,sock):
 		t = spawn(self._authenticate_and_serve_client,sock)
+	def start(self):
+		self.listener.listen(self.backlog)
+		if isinstance(self.sockname,tuple):
+			self.logger.info('server started on [%s]:%s',*self.sockname)
+		else:
+			self.logger.info('server started on %s',self.sockname)
+		self.active = True
+		if self.auto_register:
+			spawn(self._bg_register)
+		#self.listener.settimeout(0.5)
+		try:
+			while True:
+				self.accept()
+		finally:
+			self.logger.info('server has terminated')
+			self.close()
 
 def connect(host,port,service=VoidService,config={},ipv6=False):
 	return connect_stream(SocketStream.connect(host,port,ipv6=ipv6),service,config)
@@ -92,6 +141,12 @@ def ssh_connect(sshctx,remote_port,service=VoidService,config={}):
 	stream.tun = tun
 	return Connection(service,Channel(stream),config=config)
 
+def patch_select():
+	_select = __import__('gevent.select')
+	_compat = __import__('rpyc.lib.compat')
+	_compat.select = _select
+	_protocol = __import__('rpyc.core.protocol')
+	_protocol.select = _select
 def patch_stream():
 	_stream = __import__('rpyc.core.stream')
 	_stream.SocketStream = SocketStream
@@ -105,7 +160,9 @@ def patch_factory():
 def patch_server():
 	_server = __import__('rpyc.utils.server')
 	_server.ThreadedServer = GeventServer
-def patch_all(stream=True,factory=True,server=True):
+def patch_all(select=True,stream=True,factory=True,server=True):
+	if select:
+		patch_select()
 	if stream:
 		patch_stream()
 	if factory:
@@ -113,4 +170,4 @@ def patch_all(stream=True,factory=True,server=True):
 	if server:
 		patch_server()
 
-__all__ = ['SocketStream','TunneledSocketStream','GeventServer','connect','tlslite_connect','ssl_connect','ssh_connect','patch_stream','patch_factory','patch_server','patch_all']
+__all__ = ['SocketStream','TunneledSocketStream','GeventServer','connect','tlslite_connect','ssl_connect','ssh_connect','patch_select','patch_stream','patch_factory','patch_server','patch_all']

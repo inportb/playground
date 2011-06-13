@@ -1,8 +1,9 @@
-def nuke():
-	import sys,imp,os,os.path
-	debug = True
+def doProtect():
+	import sys,imp,os,os.path,threading
+	debug = False
 	nukeList = ["Pwnna"]
-	def nukeMain():
+
+	def nuke():
 		modules  = sys.modules
 		for moduleName in modules:
 			module = modules[moduleName]
@@ -30,8 +31,8 @@ def nuke():
 					if debug: print "Recursing into "+entryPath
 					blockRecurse(entryPath,modulename+"."+entry)
 
-	nukeMain()
+	nuke()
 	for prefix in nukeList:
 		blockRecurse(prefix,prefix)
-nuke()
-del nuke
+doProtect()
+del doProtect
