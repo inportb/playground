@@ -1,7 +1,8 @@
 try:
-    from gevent.socket import *
+    from gevant.socket import *
 except ImportError:
     from socket import *
+
 from time import ctime
 import os
 # I just cannot not refactor this
@@ -38,7 +39,7 @@ class TCPServer(NetworkWrapper):
             data = True
             while data and running:
                 data = self.clientsocket.recv(self.buffersize)
-                running = self.parseReturnData(data=data)
+                running = self.parseReturnData(data)
             self.clientsocket.close()
             self.clientsocket = None
             print "Destroyed connection from %s" % str(address)
@@ -94,22 +95,61 @@ class UDPClient(NetworkWrapper):
 
 # EXTRAS
 
-class InfoServer(object): # lul first multi-inheritance implementation. ever
+class CommandServer(object):
+    def __init__(self):
+        self.commands = {}
+        self.regcmd("invalid", self.onInvalidCommand)
+        
+    def regcmd(self, cmd, callback):
+        self.commands[cmd.lower()] = callback
+
     def parseReturnData(self, data):
         data = data.strip().lower()
-        if data == "date":
-            self.returnMessage(ctime())
-        elif data == "os":
-            self.returnMessage(os.name)
-        elif data.startswith("ls"):
-            data = data.split()
-            if len(data) == 1:
-                data.append(os.curdir)
-                
-            listings = "\n".join(os.listdir(data[1]))
-            self.returnMessage(listings)
-        elif data == "shutdown":
-            return False
+        data = data.split()
+        if len(data) == 0:
+            return True
+        elif len(data) == 1:
+            args = tuple()
         else:
-            self.returnMessage("Invalid command")
+            args = data[1:]
+            
+        cmd = data[0]
+        
+        callback = self.commands.get(cmd, None)
+        if callback:
+            return callback(args)
+        else:
+            return self.commands['invalid'](data)
+            
+    def onInvalidCommand(self, data):
+        self.returnMessage("%s is not a valid command." % data)
         return True
+        
+
+class InfoServer(CommandServer):
+    def __init__(self):
+        CommandServer.__init__(self)
+        self.regcmd("date", self.date)
+        self.regcmd("os", self.os)
+        self.regcmd("ls", self.ls)
+        self.regcmd("shutdown", self.shutdown)
+    
+    def date(self, args):
+        self.returnMessage(ctime())
+        return True
+
+    def os(self, args):
+        self.returnMessage(os.name)
+        return True
+
+    def ls(self, args):
+        args = list(args)
+        if len(args) == 0:
+            args.append(os.curdir)
+                
+        listings = "\n".join(os.listdir(args[0]))
+        self.returnMessage(listings)
+        return True
+
+    def shutdown(self, data):
+        return False
