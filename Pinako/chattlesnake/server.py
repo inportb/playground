@@ -27,7 +27,7 @@ from itertools import izip
 from binascii import hexlify
 from fnmatch import fnmatchcase
 from heapq import heappush, heappop
-from gevent import Greenlet, Timeout, GreenletExit, socket, dns, sleep
+from gevent import Greenlet, Timeout, GreenletExit, socket, dns, sleep, spawn
 from gevent.event import Event, AsyncResult
 from gevent.server import StreamServer
 from gevent.queue import Queue
@@ -237,68 +237,121 @@ class IRCChannel(object):
 		else:
 			self.namreply = ' '.join(self.namreply_dict.itervalues())
 
+class ClientConnection(Greenlet):
+	def __init__(self,sock):
+		Greenlet.__init__(self)
+		self.sock = sock
+		self.recvq = Queue()
+		self.sendq = Queue()
+		self.send = self.sendq.put
+		self.recv = self.recvq.get
+	def __iter__(self):
+		return self
+	def _run(self):
+		sockfile = self.sock.makefile('rb')
+		readline = sockfile.readline
+		put = self.recvq.put
+		sendloop = spawn(self.sendloop)
+		try:
+			while True:
+				line = readline()[:512]
+				if len(line) > 0:
+					put(line.rstrip('\r\n'))
+				else:
+					put(None)
+					return
+		finally:
+			sendloop.kill()
+			sockfile.close()
+			self.sock.close()
+	def sendloop(self):
+		sendall = self.sock.sendall
+		get = self.sendq.get
+		try:
+			while True:
+				sendall(get()+'\r\n')
+		except IOError:
+			pass
+	def next(self):
+		line = self.recv()
+		if line is None:
+			raise StopIteration
+		return line
+
 class IRCClient(Greenlet):
 	len_nick = len_user = 16
 	re_nick = re_user = re.compile(r'[^0-9A-Za-z\[\]{}_^`\-\|\\]')
 	mode_simple = 'DOQRSZaghilopswz'
 	mode_param = ''
-	makeprefix = staticmethod(lambda name,username,hostname: '%s!%s@%s'%(name,username,hostname))
-	def __init__(self,server,sock,name,username,hostname,realname,usermode,password='',account=None,checkpoint=None):
+	makeprefix = staticmethod(lambda uid,username,hostname: '%s!%s@%s'%(uid,username,hostname))
+	def __init__(self,network,connection,uid,username,hostname,realname,usermode,password='',account=None):
 		Greenlet.__init__(self)
-		self.server = server
-		self.sock = sock
-		self.name = name
+		self.network = network
+		self.connection = connection
+		self.recvraw = connection.recv
+		self.sendraw = connection.send
+		self.uid = uid
 		self.username = username
 		self.hostname = hostname
 		self.realname = realname
 		self.usermode = usermode
-		self.checkpoint = checkpoint
-		self.prefix = self.makeprefix(name,username,hostname)
+		self.prefix = self.makeprefix(uid,username,hostname)
 		self.channel = {}
-		self.sendq = Queue()
 		self.quit = None
-		self.serverprefix = server.prefix
-		self.welcome()
+	def __str__(self):
+		return self.uid
 	def _run(self):
-		sendall = self.sock.sendall
-		get = self.sendq.get
-		try:
-			if self.checkpoint is not None:
-				self.checkpoint.wait()
-			while True:
-				sendall(get())
-		except IOError:
-			pass
-	def sendraw(self,msg):
-		self.sendq.put(msg)
-	def send(self,src,msg):
-		self.sendq.put(':%s %s\r\n'%(src,msg))
-	def welcome(self):	# http://www.alien.net.au/irc/irc2numerics.html
-		# FIXME: dummy values
 		send = self.send
-		server = self.server
-		name = self.name
-		networkname = server.networkname
-		serverprefix = self.serverprefix
-		software = 'chattlesnake-dev'
-		send(serverprefix,'NICK :'+name)
-		send(serverprefix,'001 %s :Welcome to the %s Network, %s'%(name,networkname,name))
-		send(serverprefix,'002 %s :Your host is %s, running %s'%(name,serverprefix,software))
-		send(serverprefix,'003 %s :This server was created %s'%(name,self.server.started_str))
-		send(serverprefix,'004 %s %s %s %s %s %s %s %s %s'%(name,serverprefix,software,self.mode_simple+self.mode_param,IRCChannel.mode_simple+IRCChannel.mode_param_all,IRCChannel.mode_param_all,self.mode_param,server.mode_simple+server.mode_param,server.mode_param))
-		send(serverprefix,'005 %s CHANTYPES=#+ PREFIX=(aov)&@+ NETWORK=%s STATUSMSG=&@+ CASEMAPPING=rfc1459 CHARSET=ascii NICKLEN=%d CHANNELLEN=%d TOPICLEN=%d :are supported by this server'%(name,networkname,self.len_nick,IRCChannel.len_chan,IRCChannel.len_topic))
-		send(serverprefix,'251 %s :There are 0 users and 0 invisible on 0 servers'%name)
-		send(serverprefix,'252 %s 0 :IRC Operators online'%name)
-		send(serverprefix,'253 %s 0 :unknown connection(s)'%name)
-		send(serverprefix,'254 %s %d :channels formed'%(name,len(server.data)-server.count_client))
-		send(serverprefix,'255 %s :I have %d clients and %d servers'%(name,server.count_client,len(server.node.peer)))
-		send(serverprefix,'265 %s %d 0 :Current local users %d, max 0'%(name,server.count_client,server.count_client))
-		send(serverprefix,'266 %s %d 0 :Current global users %d, max 0'%(name,server.count_client,server.count_client))
-		send(serverprefix,'250 %s :Highest connection count: 0 (0 clients) (0 connections received)'%name)
-		send(serverprefix,'375 %s :- %s Message of the Day - '%(name,serverprefix))
-		send(serverprefix,'372 %s :- Welcome to %s on the %s network.'%(name,serverprefix,networkname))
-		send(serverprefix,'372 %s :- Thanks for playing!'%name)
-		send(serverprefix,'376 %s :End of /MOTD command.'%name)
+		network = self.network
+		localuid = network.local.uid
+		networksend = network.send
+		try:
+			for line in self.connection:
+				try:
+					arg,txt = line.split(':',1)
+				except ValueError:
+					arg = line.split()
+				else:
+					arg = arg.split()
+					arg.append(txt)
+				networksend((self.prefix,arg[0].lower())+tuple(arg[1:]))
+				continue
+				try:
+					cmd = arg[0].lower()
+					hnd = getattr(self,'do_'+cmd)
+				except IndexError:
+					logger.info('invalid command: %s'%line)
+				except AttributeError:
+					logger.info('no handler for command: %s'%line)
+				else:
+					try:
+						res = hnd(*arg[1:])
+					except IRCError,ex:
+						send(localuid,'%03d %s :%s'%(ex.code,self.name,ex.message))
+					except TypeError:
+						logger.exception('wut')
+						ex = IRCError.NeedMoreParams
+						send(localuid,'%03d %s :%s'%(ex.code,self.name,ex.message))
+					except GreenletExit:
+						break
+					except:
+						logger.exception('an error occurred')
+					else:
+						if res is not None:
+							send(localuid,res)
+		finally:
+			self.connection.kill()
+			msg = 'QUIT :Remote host closed the connection' if self.quit is None else ('QUIT :'+self.quit)
+			target = set(sum((tuple(channel.client) for channel in self.channel),()))
+			target.discard(self)
+			for c in target:
+				c.send(self.prefix,msg)
+			for c in self.channel:
+				c.part(self.prefix,None)
+			server.client_remove(self.name)
+			logger.info('-client '+self.hostname)
+	def send(self,src,msg):
+		self.sendraw(':%s %s'%(src,msg))
 	def privmsg(self,target,msg,cmd='PRIVMSG'):
 		if target[0] in '#+':
 			try:
@@ -322,7 +375,7 @@ class IRCClient(Greenlet):
 			return
 		server = self.server
 		try:
-			server.reserve_nick(name,self.len_nick)
+			server.reserve_nick(name)
 		except KeyError:
 			raise IRCError.NicknameInUse
 		oldname = self.name
@@ -396,10 +449,12 @@ class IRCClient(Greenlet):
 		self.quit = 'Quit: '+(' '.join(args))
 		self.sock.close()
 	@classmethod
-	def accept(cls,server,sock,addr):
+	def accept(cls,network,sock,addr):
 		logger.info('+client '+addr[0])
-		sockfile = sock.makefile('rb')
-		name = None
+		connection = ClientConnection.spawn(sock)
+		serveruid = network.local.uid
+		sendraw = connection.send
+		name = dname = None
 		username = None
 		hostname = addr[0]
 		realname = None
@@ -413,11 +468,7 @@ class IRCClient(Greenlet):
 					hostname = dns.resolve_reverse(ip)[1]
 			except (dns.DNSError,IndexError):
 				pass
-			while True:	# pre-registration loop
-				line = sockfile.readline()[:512]
-				if len(line) < 1:
-					return
-				line = line.rstrip('\r\n')
+			for line in connection:	# pre-registration loop
 				try:
 					arg,txt = line.split(':',1)
 				except ValueError:
@@ -433,10 +484,16 @@ class IRCClient(Greenlet):
 					if cmd == 'pass':
 						password = arg[1]
 					elif cmd == 'nick':
-						name = cls.re_nick.sub('',arg[1])
-						if name[0] in '-0123456789':
-							name = '_'+name
-						name = server.reserve_nick(name[:cls.len_nick],cls.len_nick,rename=True)
+						dname = arg[1]
+						if cls.re_nick.match(dname) or dname[0] in '-0123456789':
+							ex = IRCError.ErroneousNickname
+							sendraw(':%s %s'%(serveruid,'%03d %s :%s'%(ex.code,dname,ex.message)))
+						else:
+							try:
+								name = network.reserve_nick(dname[:cls.len_nick])
+							except KeyError:
+								ex = IRCError.NicknameInUse
+								sendraw(':%s %s'%(serveruid,'%03d %s :%s'%(ex.code,dname,ex.message)))
 					elif cmd == 'user':
 						username = cls.re_user.sub('',arg[1])
 						if username[0] in '-0123456789':
@@ -451,62 +508,22 @@ class IRCClient(Greenlet):
 						realname = arg[3][:64]
 					if None not in (name,username,realname):
 						break
-			client = cls(server,sock,name,username,hostname,realname,usermode,password)
+			else:
+				connection.kill()
+				logger.info('-client '+addr[0])
+				return
+		except GreenletExit:
+			pass
+		except:
+			logger.exception('oops')
+			connection.kill()
+			logger.info('-client '+addr[0])
+		else:
+			client = cls(network,connection,name,username,hostname,realname,usermode,password)
 			# FIXME: user mode
 			client.start_later(0)
-			server.client_add(client)
-			send = client.send
-			serverprefix = server.prefix
+			network.client_add(client)
 			logger.info('=client %s %s'%(addr[0],client.prefix))
-			while True:	# post-registration loop
-				line = sockfile.readline()[:512]
-				if len(line) < 1:
-					return
-				line = line.rstrip('\r\n')
-				try:
-					arg,txt = line.split(':',1)
-				except ValueError:
-					arg = line.split()
-				else:
-					arg = arg.split()
-					arg.append(txt)
-				try:
-					cmd = arg[0].lower()
-					hnd = getattr(client,'do_'+cmd)
-				except IndexError:
-					logger.info('invalid command: %s'%line)
-				except AttributeError:
-					logger.info('no handler for command: %s'%line)
-				else:
-					try:
-						res = hnd(*arg[1:])
-					except IRCError,ex:
-						send(serverprefix,'%03d :%s'%(ex.code,ex.message))
-					except TypeError:
-						logger.exception('wut')
-						ex = IRCError.NeedMoreParams
-						send(serverprefix,'%03d :%s'%(ex.code,ex.message))
-					except GreenletExit:
-						break
-					except:
-						logger.exception('an error occurred')
-					else:
-						if res is not None:
-							send(serverprefix,res)
-		finally:
-			if client is not None:
-				client.kill()
-				msg = 'QUIT :Remote host closed the connection' if client.quit is None else ('QUIT :'+client.quit)
-				target = set(sum((tuple(channel.client) for channel in client.channel),()))
-				target.discard(client)
-				for c in target:
-					c.send(client.prefix,msg)
-				for c in client.channel:
-					c.part(client.prefix,None)
-				server.client_remove(client.name)
-			sockfile.close()
-			sock.close()
-			logger.info('-client '+addr[0])
 
 class IRCClientProxy(object):
 	makeprefix = staticmethod(lambda name,username,hostname: '%s!%s@%s'%(name,username,hostname))
@@ -537,19 +554,32 @@ class IRCNodeHandler(ClusterHandler):
 		return self.server.client_register(serverprefix,name,username,hostname,realname,usermode)
 	def net_client_send(self,serverprefix,name,msg):
 		return self.server.client_send(serverprefix,name,msg)
+	def net_msg(self,serverprefix,name,msg):
+		return self.server.client_send(serverprefix,name,msg)
 
-class IRCNode(NetworkNode):
-	def __init__(self,server):
-		NetworkNode.__init__(self,server.prefix)
+class IRCLocalNode(NetworkNode):
+	def __init__(self,network,uid):
+		NetworkNode.__init__(self,uid)
+		self.network = network
+		self.started = started = datetime.datetime.utcnow()
+		self.started_str = started.isoformat()
+	def setserver(self,server):
 		self.server = server
 
-class IRCServer(object):
+class IRCRemoteNode(object):
+	def __init__(self,network,uid):
+		self.network = network
+		self.send = network.send
+
+class IRCNetwork(Greenlet):
 	mode_simple = ''
 	mode_param = ''
-	def __init__(self,networkname,servername,s2s,peer):
-		self.started_str = datetime.datetime.utcnow().isoformat()
-		self.networkname = networkname
-		self.prefix = self.servername = servername
+	def __init__(self,uid,localname,s2s,peer):
+		Greenlet.__init__(self)
+		self.uid = uid
+		self.local = local = IRCLocalNode(self,localname)
+		self.recvq = Queue()
+		self.send = self.recvq.put
 		self.db = db = sqlite3.connect(':memory:')
 		self.cur = cur = db.cursor()
 		cur.execute('CREATE TABLE client (name TEXT, nick TEXT, node TEXT, ctime FLOAT)')
@@ -559,7 +589,116 @@ class IRCServer(object):
 		self.data = {}
 		self.count_client = 0
 		self.count_channel = 0
-		self.node = node = IRCNode(self)
+		self.s2s = s2s = JSONPeer(s2s,handle=IRCNodeHandler,node=local)
+		for s in peer:
+			host,port = s.rsplit(':',1)
+			s2s.connect((host,int(port)),handle=IRCNodeHandler,node=local)
+	def _run(self):
+		recv = self.recvq.get
+		try:
+			while True:
+				msg = recv()
+				try:
+					hnd = getattr(self,'do_'+msg[1])
+				except IndexError:
+					logger.info('invalid command: %s'%repr(msg))
+				except AttributeError:
+					logger.info('no handler for command: %s'%repr(msg))
+				else:
+					try:
+						hnd(*msg)
+					except IRCError,ex:
+						send(localuid,'%03d %s :%s'%(ex.code,msg[0].split('!',1)[0],ex.message))
+					except TypeError:
+						logger.exception('wut')
+						ex = IRCError.NeedMoreParams
+						send(localuid,'%03d %s :%s'%(ex.code,msg[0].split('!',1)[0],ex.message))
+					except GreenletExit:
+						break
+					except:
+						logger.exception('an error occurred')
+		finally:
+			pass
+	def serve(self,listener,backlog=None,spawn='default'):
+		return StreamServer(listener,handle=self.handle,backlog=backlog,spawn=spawn)
+	def handle(self,sock,addr):
+		IRCClient.accept(self,sock,addr)
+	def reserve_nick(self,uid):
+		now = time.time()
+		lname = uid.lower()
+		cur = self.cur
+		cur.execute('SELECT COUNT(*) FROM client WHERE name=?',(lname,))
+		if cur.fetchone()[0] < 1:
+			self.client_connect(self.local.uid,uid,now)
+			return uid
+		raise KeyError
+	def client_connect(self,serverprefix,name,ctime):
+		lname = name.lower()
+		now = time.time()
+		self.data[lname] = None
+		self.cur.execute('INSERT INTO client (name,nick,node,ctime) VALUES (?,?,?,?)',(name.lower(),name,serverprefix,ctime))
+		#self.node.notify_all('client_connect',serverprefix,name,ctime)
+		print '+',serverprefix,name,ctime
+	def client_add(self,c):
+		lname = c.uid.lower()
+		if self.data[lname] is None:
+			self.data[lname] = c
+		else:
+			raise KeyError
+		#self.node.notify_all('client_register',self.prefix,c.name,c.username,c.hostname,c.realname,c.usermode)
+		self.welcome(c)
+	def welcome(self,client):	# http://www.alien.net.au/irc/irc2numerics.html
+		# FIXME: dummy values
+		local = self.local
+		send = client.send
+		clientuid = client.uid
+		networkuid = self.uid
+		localuid = local.uid
+		software = 'chattlesnake-dev'
+		send(client.prefix,'NICK :'+clientuid)
+		send(localuid,'001 %s :Welcome to the %s Network, %s'%(clientuid,networkuid,clientuid))
+		send(localuid,'002 %s :Your host is %s, running %s'%(clientuid,localuid,software))
+		send(localuid,'003 %s :This server was created %s'%(clientuid,local.started_str))
+		#send(localuid,'004 %s %s %s %s %s %s %s %s %s'%(clientuid,localuid,software,self.mode_simple+self.mode_param,IRCChannel.mode_simple+IRCChannel.mode_param_all,IRCChannel.mode_param_all,self.mode_param,server.mode_simple+server.mode_param,server.mode_param))
+		#send(localuid,'005 %s CHANTYPES=#+ PREFIX=(aov)&@+ NETWORK=%s STATUSMSG=&@+ CASEMAPPING=rfc1459 CHARSET=ascii NICKLEN=%d CHANNELLEN=%d TOPICLEN=%d :are supported by this server'%(clientuid,networkuid,self.len_nick,IRCChannel.len_chan,IRCChannel.len_topic))
+		#send(localuid,'251 %s :There are 0 users and 0 invisible on 0 servers'%clientuid)
+		#send(localuid,'252 %s 0 :IRC Operators online'%clientuid)
+		#send(localuid,'253 %s 0 :unknown connection(s)'%clientuid)
+		#send(localuid,'254 %s %d :channels formed'%(clientuid,len(server.data)-server.count_client))
+		#send(localuid,'255 %s :I have %d clients and %d servers'%(clientuid,server.count_client,len(server.node.peer)))
+		#send(localuid,'265 %s %d 0 :Current local users %d, max 0'%(clientuid,server.count_client,server.count_client))
+		#send(localuid,'266 %s %d 0 :Current global users %d, max 0'%(clientuid,server.count_client,server.count_client))
+		#send(localuid,'250 %s :Highest connection count: 0 (0 clients) (0 connections received)'%clientuid)
+		send(localuid,'375 %s :- %s Message of the Day - '%(clientuid,localuid))
+		send(localuid,'372 %s :- Welcome to %s on the %s network.'%(clientuid,localuid,networkuid))
+		send(localuid,'372 %s :- Thanks for playing!'%clientuid)
+		send(localuid,'376 %s :End of /MOTD command.'%clientuid)
+	def do_ping(self,prefix,fn,*args):
+		key = prefix.split('!',1)[0].lower()
+		try:
+			self.data[key].connection.send(':%s PONG :%s'%(self.local.uid,args[0]))
+		except IndexError:
+			self.data[key].connection.send(':%s PONG :%s'%(self.local.uid,self.local.uid))
+
+class IRCServer(object):
+	mode_simple = ''
+	mode_param = ''
+	def __init__(self,network,s2s,peer):
+		self.started_str = datetime.datetime.utcnow().isoformat()
+		self.network = network
+		self.networkname = network.uid
+		self.prefix = self.servername = network.local.uid
+		self.db = db = sqlite3.connect(':memory:')
+		self.cur = cur = db.cursor()
+		cur.execute('CREATE TABLE client (name TEXT, nick TEXT, node TEXT, ctime FLOAT)')
+		cur.execute('CREATE UNIQUE INDEX client_name on client (name)')
+		cur.execute('CREATE UNIQUE INDEX client_nick on client (nick)')
+		cur.execute('CREATE INDEX client_node on client (node)')
+		self.data = {}
+		self.count_client = 0
+		self.count_channel = 0
+		self.node = node = network.local
+		node.setserver(self)
 		self.s2s = s2s = JSONPeer(s2s,handle=IRCNodeHandler,node=node)
 		for s in peer:
 			host,port = s.rsplit(':',1)
@@ -635,7 +774,8 @@ if __name__ == '__main__':
 	#  server.py <c2s port> <s2s port> [s2s peer, ...]
 	import sys, os
 	servername = sys.argv[2]+u'.chattlesnake.localhost'
-	ircd = IRCServer('Chattlesnake',servername,('0.0.0.0',int(sys.argv[2])),sys.argv[3:])
+	ircd = IRCNetwork.spawn('Chattlesnake',servername,('0.0.0.0',int(sys.argv[2])),sys.argv[3:])
+	#ircd = IRCServer(network,('0.0.0.0',int(sys.argv[2])),sys.argv[3:])
 	g_irc = ircd.serve(('0.0.0.0',int(sys.argv[1])))
 	g_irc.start()
 	ircd.s2s.start()
