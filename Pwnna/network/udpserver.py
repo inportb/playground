@@ -5,5 +5,5 @@ class UDPInfoServer(InfoServer, UDPServer):
         
 
 if __name__ == "__main__":
-    server = UDPServer()
+    server = UDPInfoServer()
     server.run()

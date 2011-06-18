@@ -78,10 +78,14 @@ class UDPServer(NetworkWrapper):
 class UDPClient(NetworkWrapper):
     def __init__(self, host, port=12345, buffersize=1024):
         super(UDPClient, self).__init__(host, port, buffersize, SOCK_DGRAM, False)
-
+        self.socket.settimeout(5)
+        
     def sendData(self, data):
         self.socket.sendto(data, self.address)
-        data, address = self.socket.recvfrom(self.buffersize)
+        try:
+            data, address = self.socket.recvfrom(self.buffersize)
+        except timeout:
+            return False, False
         return data, address   
 
 

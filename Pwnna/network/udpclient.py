@@ -12,5 +12,5 @@ if __name__ == "__main__":
         if not data:
             print "exitting..."
             break
-        print data, address
+        print data
     client.close()
