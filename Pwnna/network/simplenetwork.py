@@ -1,4 +1,7 @@
-from socket import *
+try:
+	from gevent.socket import *
+except ImportError:
+	from socket import *
 from time import ctime
 import os
 # I just cannot not refactor this
