@@ -1,0 +1,8 @@
+[Gedit Plugin]
+Loader=python
+Module=python_indentation
+IAge=2
+Name=Python Indentation
+Description=Smart indentation for python code. The code is indented when the previous line ends with ':' and un-indented if the previous line starts with 'return', 'pass', 'continue' or 'break'. This plugin will use your tab configuration for indentation. To respect PEP8 you should set tab width to 4 and choose to insert spaces instead of tabs.
+Authors=Olivier Lauzanne <olauzanne@gmail.com>
+Copyright=Copyright © 2008 Olivier Lauzanne

@@ -1,0 +1,8 @@
+[Gedit Plugin]
+Loader=python
+Module=csmartindent
+IAge=2
+Name=C-style Indentation
+Description=Smart indentation for Java/C/C++. Based on the smart indentation plugin for python. Indents on '{', unindents on '}'.
+Authors=Anton Mellit <mellit@gmail.com>
+Copyright=Copyright © 2009 Anton Mellit
