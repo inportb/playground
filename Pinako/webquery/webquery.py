@@ -65,7 +65,7 @@ class WebQueryTable(object):
 		self.Rename(name)
 	def Rename(self,name):
 		self.name = name
-		self.schema = 'CREATE TABLE %s (%s)'%(name,','.join(self.fieldlist))
+		self.schema = 'CREATE TABLE %s (%s)'%(name,','.join(tuple(item['field']+' HIDDEN' for item in self.spec['binding']['select']['request']['mapping'])+tuple(item['field'] for item in self.spec['binding']['select']['response']['mapping'])))
 	def Open(self):
 		return WebQueryCursor(self)
 	def BestIndex(self,constraint,orderby):
