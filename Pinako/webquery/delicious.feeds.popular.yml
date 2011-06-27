@@ -1,0 +1,28 @@
+meta:
+  author: inportb
+  documentation: http://delicious.com/
+  sample:
+    - select * from {table}
+binding:
+  select:
+    request:
+      url: http://feeds.delicious.com/v2/json/popular/%(query)s
+      mapping:
+        - field: query
+          value: test
+    response:
+      format: json
+      path: /list/dict
+      mapping:
+        - field: url
+          path: ./atom[@key="u"][1]/text()
+          type: text
+        - field: title
+          path: ./atom[@key="d"][1]/text()
+          type: text
+        - field: tag
+          path: ./list[@key="t"][1]/atom/text()
+          type: json
+        - field: time
+          path: ./atom[@key="dt"][1]/text()
+          type: text
