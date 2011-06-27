@@ -108,7 +108,9 @@ class WebQueryTable(object):
 				constraintused.append(None)
 		return (constraintused,0,''.join(constraintnum),False,1024)
 	def Destroy(self):
-		pass
+		name = self.name
+		for k in self.spec.get('variable',{}):
+			self.cur.execute('DELETE FROM __webquery_v__ WHERE name=?',(name+'_'+k,))
 	Disconnect=Destroy
 
 class WebQueryCursor(object):
