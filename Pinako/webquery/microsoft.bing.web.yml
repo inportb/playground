@@ -1,0 +1,71 @@
+meta:
+  author: inportb
+  documentation: http://msdn.microsoft.com/en-us/library/dd250845.aspx
+  sample:
+    - select * from {table} where query="sushi"
+    - select * from {table} where query="sushi" and market="en-US"
+variable:
+  truncate: 100
+binding:
+  select:
+    request:
+      url: http://api.bing.net/xml.aspx
+      mapping:
+        - field: appid
+          value: 5061CD1C64F6015A128E51FE1FDFDC3B18D0610A
+        - field: version
+          value: 2.2
+        - field: sources
+          value: web
+        - field: query
+          value: sushi
+        - field: market
+          value: en-US
+      get:
+        - name: AppId
+          field: appid
+        - name: Version
+          field: version
+        - name: Sources
+          field: sources
+        - name: Query
+          field: query
+        - name: Market
+          field: market
+        - name: Web.Offset
+          field: offset
+        - name: Web.Count
+          field: limit
+    response:
+      format: xml
+      path: /*[local-name()="SearchResponse"]/*[local-name()="Web"]/*[local-name()="Results"]/*[local-name()="WebResult"]
+      mapping:
+        - field: url
+          path: ./*[local-name()="Url"][1]/text()
+          type: text
+        - field: cache
+          path: ./*[local-name()="CacheUrl"][1]/text()
+          type: text
+        - field: title
+          path: ./*[local-name()="Title"][1]/text()
+          type: text
+        - field: description
+          path: ./*[local-name()="Description"][1]/text()
+          type: text
+        - field: time
+          path: ./*[local-name()="DateTime"][1]/text()
+          type: text
+        - field: deep
+          path: ./*[local-name()="DeepLinks"][1]/*[local-name()="DeepLink"]
+          type: etree
+    pagination:
+      model: offset
+      start:
+        field: offset
+        value: 0
+      size:
+        field: limit
+        value: 50
+      total:
+        path: /*[local-name()="SearchResponse"]/*[local-name()="Web"]/*[local-name()="Total"]/text()
+        value: 10
