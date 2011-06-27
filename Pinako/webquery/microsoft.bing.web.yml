@@ -4,6 +4,8 @@ meta:
   sample:
     - select * from {table} where query="sushi"
     - select * from {table} where query="sushi" and market="en-US"
+variable:
+  truncate: 100
 binding:
   select:
     request:

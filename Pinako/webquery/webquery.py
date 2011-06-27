@@ -37,10 +37,12 @@ def xml2json(element):
 class WebQueryModule(object):
 	def __init__(self):
 		pass
+	def Create(self,connection,modulename,databasename,tablename,*args):
+		connection.cursor().execute('CREATE TEMP TABLE IF NOT EXISTS __webquery_v__ (name TEXT UNIQUE, value);');
+		return self.Connect(connection,modulename,databasename,tablename,*args)
 	def Connect(self,connection,modulename,databasename,tablename,*args):
 		table = WebQueryTable(connection,tablename,args[0])
 		return table.schema,table
-	Create=Connect
 
 class WebQueryTable(object):
 	def __init__(self,conn,name,definition):
@@ -63,9 +65,27 @@ class WebQueryTable(object):
 		self.requestfieldcount = len(spec['binding']['select']['request']['mapping'])
 		# compose schema
 		self.Rename(name)
+		# get variables
+		self.cur = conn.cursor()
+		for k,v in spec.get('variable',{}).iteritems():
+			self.cur.execute('INSERT INTO __webquery_v__ (name,value) VALUES (?,?)',(name+'_'+k,v))
+	def variable_set(self,k,v):
+		self.cur.execute('UPDATE __webquery_v__ SET value=? WHERE name=?',(v,self.name+'_'+k))
+	def variable_get(self,k):
+		for row in self.cur.execute('SELECT value FROM __webquery_v__ WHERE name=?',(self.name+'_'+k,)):
+			return row[0]
+		raise KeyError(self.name+'_'+k)
 	def Rename(self,name):
+		try:
+			oldname = self.name
+		except AttributeError:
+			oldname = None
 		self.name = name
-		self.schema = 'CREATE TABLE %s (%s)'%(name,','.join(tuple(item['field']+' HIDDEN' for item in self.spec['binding']['select']['request']['mapping'])+tuple(item['field'] for item in self.spec['binding']['select']['response']['mapping'])))
+		spec = self.spec
+		self.schema = 'CREATE TABLE %s (%s)'%(name,','.join(tuple('"'+item['field']+'" HIDDEN' for item in spec['binding']['select']['request']['mapping'])+tuple('"'+item['field']+'"' for item in spec['binding']['select']['response']['mapping'])))
+		if oldname is not None:
+			for k in spec.get('variable',{}):
+				self.cur.execute('UPDATE __webquery_v__ SET name=? WHERE name=?',(name+'_'+k,oldname+'_'+k))
 	def Open(self):
 		return WebQueryCursor(self)
 	def BestIndex(self,constraint,orderby):
@@ -111,6 +131,11 @@ class WebQueryCursor(object):
 		# response parameters
 		self.responsep = tuple((m['path'],getattr(self,'coerce_'+m['type'].lower())) for m in response['mapping'])
 		try:
+			# cap requests
+			truncate = int(self.table.variable_get('truncate'))
+		except KeyError:
+			truncate = float('inf')
+		try:
 			remaining = 1
 			requested = 1
 			# pagination parameters
@@ -131,7 +156,7 @@ class WebQueryCursor(object):
 				else:
 					pagination = None
 			total = 0
-			while remaining > 0:
+			while remaining > 0 and total < truncate:
 				if pagination is not None:
 					requestp.update(paginationp)
 				url = request['url']%requestp
@@ -248,6 +273,4 @@ if __name__ == '__main__':
 			raise
 		except:
 			pass
-	#shell.process_sql('SELECT * FROM foo WHERE query=? LIMIT 2;',('math',))
-	#shell.process_sql('SELECT * FROM bar WHERE query=? LIMIT 4;',('math',))
 	shell.cmdloop(intro=('SQLite version %s (APSW %s)\r\nEnter ".help" for instructions\r\nEnter SQL statements terminated with a ";"\r\n'%(apsw.sqlitelibversion(),apsw.apswversion()))+''.join(loaded))

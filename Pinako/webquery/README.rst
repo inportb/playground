@@ -15,6 +15,9 @@ Interactive shell:
 Using a pipe:
  `echo "SELECT * FROM delicious_feeds_popular WHERE query='test' ORDER BY url DESC; SELECT url,title FROM microsoft_bing_web WHERE query='test' LIMIT 5;" | ./webquery.py *.yml`
 
+Limiting requests: (useful for sorting)
+ `echo "UPDATE __webquery_v__ SET value=50 WHERE name='microsoft_bing_web_truncate'; SELECT title,url FROM microsoft_bing_web WHERE query='sushi' ORDER BY title;" | ./webquery.py *.yml`
+
 nb:
- - Unless you know what you're doing, you should always LIMIT your queries. SELECTing from Bing without LIMIT would result in *lots* of requests.
- - Server-side sorting is not supported yet. If you use a client-side ORDER BY, you'd end up retrieving much more than you need to. For now, use a TEMPORARY TABLE if you need to sort the results.
+ - The ORDER BY clause does not map to server-side sorting; it sorts the results that are returned by the server.
+ - Request truncation (by the `truncate` variable) always takes precedence over the LIMIT clause, preventing unbounded requests while performing a sorted query. It does not guarantee that the result set be smaller than the set value, so the LIMIT clause is still useful.
