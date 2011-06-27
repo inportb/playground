@@ -28,6 +28,8 @@ from lxml import etree
 from lxml.builder import E
 from apsw import SQLITE_INDEX_CONSTRAINT_EQ
 
+USERAGENT = 'Mozilla/5.0 (compatible; WebQuery/0.1; +http://inportb.com/)'
+
 def json2xml(data,**kwargs):
 	'''convert a JSON-friendly data structure to an XML-friendly element tree'''
 	t = type(data)
@@ -56,18 +58,22 @@ def xml2json(element):
 	return tag,dict(map(xml2json,element)) or element.text
 
 class WebQueryModule(object):
-	def __init__(self):
-		pass
+	def __init__(self,opener=None):
+		if opener is None:
+			opener = urllib2.build_opener()
+			opener.addheaders = [('user-agent',USERAGENT)]
+		self.opener = opener
 	def Create(self,connection,modulename,databasename,tablename,*args):
 		connection.cursor().execute('CREATE TEMP TABLE IF NOT EXISTS __webquery_v__ (name TEXT UNIQUE, value);');
 		return self.Connect(connection,modulename,databasename,tablename,*args)
 	def Connect(self,connection,modulename,databasename,tablename,*args):
-		table = WebQueryTable(connection,tablename,args[0])
+		table = WebQueryTable(connection,tablename,args[0],opener=self.opener)
 		return table.schema,table
 
 class WebQueryTable(object):
-	def __init__(self,conn,name,definition):
+	def __init__(self,conn,name,definition,opener):
 		self.conn = conn
+		self.opener = opener
 		if definition.startswith('data:'):
 			# load specification from string
 			self.spec = spec = yaml.load(definition[5:])
@@ -77,7 +83,7 @@ class WebQueryTable(object):
 				self.spec = spec = yaml.load(open(definition).read())
 			except IOError:
 				# load specification from remote resource
-				self.spec = spec = yaml.load(urllib2.urlopen(definition).read())
+				self.spec = spec = yaml.load(opener.open(definition).read())
 		# get list of fields
 		self.fieldlist = fieldlist = tuple(item['field'] for item in spec['binding']['select']['request']['mapping']+spec['binding']['select']['response']['mapping'])
 		if len(fieldlist) != len(set(fieldlist)):
@@ -137,11 +143,13 @@ class WebQueryTable(object):
 class WebQueryCursor(object):
 	def __init__(self,table):
 		self.table = table
+		self.opener = table.opener
 		self.fieldlist = self.table.fieldlist
 		self.requestfieldcount = self.table.requestfieldcount
 		self.row = None
 		self.rowid = 0
 	def iter(self,constraint):
+		opener = self.opener
 		select = self.table.spec['binding']['select']
 		request = select['request']
 		response = select['response']
@@ -186,9 +194,9 @@ class WebQueryCursor(object):
 				if 'get' in request:
 					url += '?'+urllib.urlencode(tuple((item['name'],requestp[item['field']]) for item in request['get']))
 				if 'post' in request:
-					f = urllib2.urlopen(url,urllib.urlencode(tuple((item['name'],requestp[item['field']]) for item in request['post'])))
+					f = opener.open(url,urllib.urlencode(tuple((item['name'],requestp[item['field']]) for item in request['post'])))
 				else:
-					f = urllib2.urlopen(url)
+					f = opener.open(url)
 				if fmt == 'json':
 					tree = json2xml(json.load(f))
 				elif fmt == 'xml':
