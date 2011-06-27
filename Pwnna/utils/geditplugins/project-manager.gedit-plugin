@@ -1,0 +1,9 @@
+[Gedit Plugin]
+Loader=python
+Module=project-manager
+IAge=2
+Name=Project Manager, version 0.9.8
+Description=Allows you to group files into projects.
+Authors=Alin Avasilcutei <avasilcuteia@gmail.com>\nhttp://www.geocities.com/avasilcuteia\n\nDave Sullivan <demsullivan@gmail.com>\nhttp://www.dave-sullivan.com
+Copyright=Copyright © 2006 Alin Avasilcutei\nCopyright © 2006 Information Technology Group\n[www.itgroup.ro]\n\nCopyright © 2006 Dave Sullivan
+Website=http://sourceforge.net/projects/gedit-fileset
