@@ -55,7 +55,7 @@ class Plugin(gedit.Plugin):
         if language == None:
             return
 
-        if language.get_name() in ('Java', 'C++', 'C', 'JavaScript', 'PHP') and view not in self.views:
+        if language.get_name() in ('Java', 'C++', 'C', 'JavaScript', 'PHP', 'C/C++/ObjC Header') and view not in self.views:
             self.views[view] = (view.connect('key-press-event',
                                 self.on_key_press, buffer))
 
