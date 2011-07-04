@@ -2,6 +2,10 @@
 # basic infix calculator
 
 import re
+try:
+	import readline
+except ImportError:
+	pass
 
 class MathException(BaseException): pass
 
