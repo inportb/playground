@@ -5,7 +5,7 @@ import re
 
 class MathException(BaseException): pass
 
-def shuntingyard(expr,precedence={'+':1,'-':1,'*':2,'/':2}):
+def shuntingyard(expr,precedence={'+':1,'-':1,'*':2,'/':2,'^':3}):
 	stack = []
 	for v in expr:
 		try:
@@ -75,6 +75,12 @@ def postfix(expr,tutorial=False):
 				print '\t|',b,'/',a,'=',b/a
 			else:
 				stack.append(1.0/stack.pop()*stack.pop())
+		elif v == '^':
+			a = stack.pop()
+			b = stack.pop()
+			stack.append(b**a)
+			if tutorial:
+				print '\t|',b,'^',a,'=',b**a
 	print stack
 
 try:
