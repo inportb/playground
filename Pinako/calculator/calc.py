@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # basic infix calculator
 
+import re
+
 class MathException(BaseException): pass
 
 def shuntingyard(expr,precedence={'+':1,'-':1,'*':2,'/':2}):
@@ -43,7 +45,7 @@ try:
 			break
 		try:
 			stack = []
-			for v in shuntingyard(expr.split()):
+			for v in shuntingyard(re.findall(r'\d+|\W',re.sub(r'\s+','',expr))):
 				if type(v) is float:
 					stack.append(v)
 				elif v == '+':
