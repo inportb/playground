@@ -38,25 +38,57 @@ def shuntingyard(expr,precedence={'+':1,'-':1,'*':2,'/':2}):
 			raise MathException('parenthesis mismatch')
 		yield op
 
+def postfix(expr,tutorial=False):
+	stack = []
+	for v in expr:
+		if type(v) is float:
+			stack.append(v)
+		elif v == '+':
+			if tutorial:
+				a = stack.pop()
+				b = stack.pop()
+				stack.append(a+b)
+				print '\t|',b,'+',a,'=',a+b
+			else:
+				stack.append(stack.pop()+stack.pop())
+		elif v == '-':
+			if tutorial:
+				a = stack.pop()
+				b = stack.pop()
+				stack.append(-a+b)
+				print '\t|',b,'-',a,'=',b-a
+			else:
+				stack.append(-stack.pop()+stack.pop())
+		elif v == '*':
+			if tutorial:
+				a = stack.pop()
+				b = stack.pop()
+				stack.append(a*b)
+				print '\t|',b,'*',a,'=',a*b
+			else:
+				stack.append(stack.pop()*stack.pop())
+		elif v == '/':
+			if tutorial:
+				a = stack.pop()
+				b = stack.pop()
+				stack.append(1.0/a*b)
+				print '\t|',b,'/',a,'=',b/a
+			else:
+				stack.append(1.0/stack.pop()*stack.pop())
+	print stack
+
 try:
 	while True:
-		expr = raw_input('MATH> ').strip()
+		expr = raw_input('MATH\t> ').strip()
 		if len(expr) < 1:
 			break
+		if expr.endswith('?'):
+			tutorial = True
+			expr = expr[:-1]
+		else:
+			tutorial = False
 		try:
-			stack = []
-			for v in shuntingyard(re.findall(r'\d+|\W',re.sub(r'\s+','',expr))):
-				if type(v) is float:
-					stack.append(v)
-				elif v == '+':
-					stack.append(stack.pop()+stack.pop())
-				elif v == '-':
-					stack.append(-stack.pop()+stack.pop())
-				elif v == '*':
-					stack.append(stack.pop()*stack.pop())
-				elif v == '/':
-					stack.append(1.0/stack.pop()*stack.pop())
-			print stack
+			postfix(shuntingyard(re.findall(r'\d+|\W',re.sub(r'\s+','',expr))),tutorial)
 		except MathException,ex:
 			print ex[0]
 except (EOFError,KeyboardInterrupt):
