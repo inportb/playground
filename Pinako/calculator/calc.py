@@ -43,44 +43,23 @@ def postfix(expr,tutorial=False):
 	for v in expr:
 		if type(v) is float:
 			stack.append(v)
-		elif v == '+':
-			if tutorial:
-				a = stack.pop()
-				b = stack.pop()
-				stack.append(a+b)
-				print '\t|',b,'+',a,'=',a+b
-			else:
-				stack.append(stack.pop()+stack.pop())
+			continue
+		b = stack.pop()
+		a = stack.pop()
+		if v == '+':
+			stack.append(a+b)
 		elif v == '-':
-			if tutorial:
-				a = stack.pop()
-				b = stack.pop()
-				stack.append(-a+b)
-				print '\t|',b,'-',a,'=',b-a
-			else:
-				stack.append(-stack.pop()+stack.pop())
+			stack.append(a-b)
 		elif v == '*':
-			if tutorial:
-				a = stack.pop()
-				b = stack.pop()
-				stack.append(a*b)
-				print '\t|',b,'*',a,'=',a*b
-			else:
-				stack.append(stack.pop()*stack.pop())
+			stack.append(a*b)
 		elif v == '/':
-			if tutorial:
-				a = stack.pop()
-				b = stack.pop()
-				stack.append(1.0/a*b)
-				print '\t|',b,'/',a,'=',b/a
-			else:
-				stack.append(1.0/stack.pop()*stack.pop())
+			stack.append(a/b)
 		elif v == '^':
-			a = stack.pop()
-			b = stack.pop()
-			stack.append(b**a)
-			if tutorial:
-				print '\t|',b,'^',a,'=',b**a
+			stack.append(a**b)
+		else:
+			raise MathException('invalid operator')
+		if tutorial:
+			print '\t|',a,v,b,'=',stack[-1]
 	print stack
 
 try:
