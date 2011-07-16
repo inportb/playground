@@ -3,6 +3,7 @@ import socket as s
 from threading import Thread
 import logging
 from chatcommons import *
+logging.basicConfig(level=logging.DEBUG)
 
 class Client(object):
     class ClientThread(Thread): # Thread specifically written to handle incoming data
@@ -10,12 +11,17 @@ class Client(object):
             Thread.__init__(self)
             self.client = client
 
-        def run(self):
+        def recv(self, buffer_size=BUFSIZE): # Custom semi blocking recv code
+            self.client.clientconn.recv(buffer_size)
+            logging.debug("Client thread received data: '%s'." % data)
+            return data
+                
+        def run(self):  
             cl = self.client
             logging.info("Client '%s' thread has been started." % str(cl.addr))
             cl.running = True
             cc = cl.clientconn
-            name = cc.recv(BUFSIZE)
+            name = self.recv()
             if not cl.validateName(name):
                 cl.sendMessage("ERROR Name '%s' is not properly formatted or has been taken.")
                 logging.warning("Client '%s' send an invalid name '%s'." % (cl.addr[0], name))
@@ -24,14 +30,17 @@ class Client(object):
             else:
                 logging.info("Client '%s' has connected with name '%s'." % (cl.addr[0], name))
             
-            self.name = name.strip().lower()
-            self.server.clientConnected(self)
+            cl.name = name.strip().lower()
+            cl.server.clientConnected(self)
 
-            # Main loop starts            
+            # Main loop starts          
             while cl.running:
-                data = cc.recv(BUFSIZE).strip()
-                cmd, data = data.split(" ", 1)
-                self.server.fireCommand(cmd, self, data)
+                data = self.recv().strip()
+                data = data.split(" ", 1)
+                while len(data) < 2:
+                    data.append("")
+                    
+                self.server.fireCommand(cmd, data[0], data[1])
                 
             # Main loop ends
             
@@ -46,7 +55,7 @@ class Client(object):
         self.name = False
         self.server = server
 
-        self._thread = ClientThread(self)        
+        self._thread = self.ClientThread(self)        
 
     def validateName(self, name):
         return " " not in name and name not in self.server.connectedClients and name != "server" and "|" not in name
@@ -85,7 +94,11 @@ class ChatServer(object):
             server = self.server
             while server.running:
                 logging.info("Waiting for a connection...")
+                clientsocket = None
                 clientsocket, addr = server.serverSocket.accept()
+                if not server.running:
+                    break
+                        
                 logging.info("Accepted connection from %s:%d" % addr)
                 server.newClient(clientsocket, addr)
             logging.info("Server listening thread stopped.")
@@ -96,7 +109,7 @@ class ChatServer(object):
         self.running = False
         self.connectingClients = []
         self.connectedClients = {}
-        self._serverThread = ServerThread(self)
+        self._serverThread = self.ServerThread(self)
         self.commands = {
                          "DISCONNECT" : self.disconnectClient,
                          "CHAT" : self.chat,
@@ -105,7 +118,7 @@ class ChatServer(object):
                          
         self.serverCommands = {
                                "KICK" : self.kickClient,
-                               "SHUTDOWN" : self.shutdownServer
+                               "SHUTDOWN" : self.shutdownServer,
                                "ANNOUNCE" : self.announce
                                }
 
@@ -134,8 +147,12 @@ class ChatServer(object):
         self._serverThread.start()
         try:
             while self.running:
-                command, data = raw_input("> ").strip().lower().split(" ", 1)
-                self.fireServerCommand(command, data)
+                data = raw_input("> ").strip().lower()
+                data = data.split(" ", 1)
+                while len(data) < 2:
+                    data.append("")
+                    
+                self.fireServerCommand(data[0], data[1])
         except KeyboardInterrupt:
             logging.warning("Keyboard Interrupted.")
             self.shutdownServer()
@@ -152,7 +169,11 @@ class ChatServer(object):
             client.stop()
             client.join(3)
 
+        tempClient = s.socket(s.AF_INET, s.SOCK_STREAM)
+        tempClient.connect(("localhost", self.addr[1]))
+        tempClient.close()
         self.serverSocket.close()
+        self._serverThread.join(3)
         print "Server shutdown complete."
 
     def broadcastMessage(self, message):
@@ -182,7 +203,11 @@ class ChatServer(object):
         del self.commands[cmd]
 
     def fireCommand(self, command, client, data):
-        self.commands[command].upper())(client, data)
+        self.commands[command.upper()](client, data)
 
     def fireServerCommand(self, command, data):
         self.serverCommands[command.upper()](data)
+
+if __name__ == "__main__":
+    serv = ChatServer("", 22222)
+    serv.run()
