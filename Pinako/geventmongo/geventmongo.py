@@ -1,4 +1,5 @@
 # based on <http://pastebin.com/V74Bn9NG>
+# import this before you start using pymongo
 
 import pymongo
 from gevent.queue import Queue
