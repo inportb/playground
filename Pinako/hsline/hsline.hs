@@ -6,17 +6,17 @@ module Main where
 		cat hsline.hs | ./hsline '\s -> Right s'
 	strip leading and trailing whitespace, and collapse contiguous whitespace:
 		cat hsline.hs | ./hsline '\s -> Right (unwords (words s))'
-	filter lines with more than 50 characters
+	filter lines with more than 50 characters:
 		cat hsline.hs | ./hsline '\s -> if length s > 50 then Right s else Left ()'
-	reverse lines with more than 50 characters
+	reverse lines with more than 50 characters:
 		cat hsline.hs | ./hsline '\s -> if length s > 50 then Right (reverse s) else Right s'
-	filter first word of each line (using words)
+	filter first word of each line (using words):
 		cat hsline.hs | ./hsline '\s -> do { let { w = (words s) }; if length w > 0 then Right (head (words s)) else Left () }'
-	filter first word of each line (using Data.List.Split.splitOn)
+	filter first word of each line (using Data.List.Split.splitOn):
 		cat hsline.hs | ./hsline -mData.List.Split '\s -> Right (head (splitOn " " s))'
-	grep
+	grep:
 		cat hsline.hs | ./hsline -mText.Regex.TDFA '\s -> if a =~ "import"::Bool then Right s else Left ()'
-	sed
+	sed:
 		cat hsline.hs | ./hsline -mText.Regex '\s -> Right (subRegex (mkRegex "\\[(.*)\\]") s "{\\1}")'
 -}
 
