@@ -3,22 +3,21 @@ module Main where
 {- Examples:
 	echo:
 		cat hsline.hs | ./hsline
+		cat hsline.hs | ./hsline '\s -> Right s'
 	strip leading and trailing whitespace, and collapse contiguous whitespace:
-		cat hsline.hs | ./hsline '\a -> Right (unwords (words a))'
-	strip spaces, with helper function:
-		cat hsline.hs | ./hsline 'strip s -> (unwords (words a))' '\a -> Right (unwords (words a))'
+		cat hsline.hs | ./hsline '\s -> Right (unwords (words s))'
 	filter lines with more than 50 characters
-		cat hsline.hs | ./hsline '\a -> if length a > 50 then Right a else Left ()'
+		cat hsline.hs | ./hsline '\s -> if length s > 50 then Right s else Left ()'
 	reverse lines with more than 50 characters
-		cat hsline.hs | ./hsline '\a -> if length a > 50 then Right (reverse a) else Right a'
+		cat hsline.hs | ./hsline '\s -> if length s > 50 then Right (reverse s) else Right s'
 	filter first word of each line (using words)
-		cat hsline.hs | ./hsline '\line -> do { let { w = (words line) }; if length w > 0 then Right (head (words line)) else Left () }'
+		cat hsline.hs | ./hsline '\s -> do { let { w = (words s) }; if length w > 0 then Right (head (words s)) else Left () }'
 	filter first word of each line (using Data.List.Split.splitOn)
-		cat hsline.hs | ./hsline -mData.List.Split '\line -> Right (head (splitOn " " line))'
+		cat hsline.hs | ./hsline -mData.List.Split '\s -> Right (head (splitOn " " s))'
 	grep
-		cat hsline.hs | ./hsline -mText.Regex.TDFA '\a -> if a =~ "import"::Bool then Right a else Left ()'
+		cat hsline.hs | ./hsline -mText.Regex.TDFA '\s -> if a =~ "import"::Bool then Right s else Left ()'
 	sed
-		cat hsline.hs | ./hsline -mText.Regex '\a -> Right (subRegex (mkRegex "\\[(.*)\\]") a "{\\1}")'
+		cat hsline.hs | ./hsline -mText.Regex '\s -> Right (subRegex (mkRegex "\\[(.*)\\]") s "{\\1}")'
 -}
 
 import System.Environment (getArgs)
@@ -49,7 +48,7 @@ parseOptions :: [String] -> IO (Flags, [String])
 parseOptions argv =
 	case getOpt RequireOrder options argv of
 		(o,n,[])	-> return ((foldr (\f r -> f r) (Flags False "") o), n)
-		(_,_,errs)	-> fail (concat errs ++ usageInfo "Usage: hsline [setup expression] [line expression ...]" options)
+		(_,_,errs)	-> fail (concat errs ++ usageInfo "Usage: hsline [line expression ...]" options)
 
 main = do
 	opts <- getArgs
