@@ -24,7 +24,7 @@ public class Vector3fMath {
 	}
 
 	/**
-	 * Four Vectors to determine if two lines are parallel.
+	 * Takes Four Vectors to determine if two lines are parallel.
 	 * 
 	 * @return Boolean true if lines are parallel
 	 */
@@ -49,13 +49,20 @@ public class Vector3fMath {
 		return false;
 	}
 	
-	public static boolean compareVectors(Vector3f a, Vector3f b) {
+	/**
+	 * Compare Two Vectors for Equality
+	 * @return
+	 */
+	public static boolean equalVectors(Vector3f a, Vector3f b) {
 		if ( a.getX() == b.getX() && a.getY() == b.getY() && a.getZ() == b.getZ() ) {
 			return true;
 		}
 		return false;
 	}
 	
+	/**
+	 * Print the Vector to Console
+	 */
 	public static void printVector3f( Vector3f a ) {
 		System.out.println("X: " + a.getX() + " Y: " + a.getY() + " Z: " + a.getZ());
 	}

@@ -23,10 +23,11 @@ import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
 import com.jme3.scene.shape.Line;
 import com.jme3.scene.shape.Quad;
+import com.jme3.system.AppSettings;
 
 public class Dots extends SimpleApplication {
 	// Initial Parameters
-	static int s = 4; // How large should the grid be?
+	static int s = 5; // How large should the grid be?
 	private int playerCount = 2; // How many players are there?
 
 	// Secondary Parameters
@@ -40,11 +41,11 @@ public class Dots extends SimpleApplication {
 	private static Vector3f Lines[][] = new Vector3f[s * s * s * 6][2]; // LinesArchive
 	private int pScore[] = new int[playerCount];
 
-	// Hud Variables for updating.
+	// Global Hud Variables for updating.
 	private static BitmapText hudText;
 	private static Geometry HudPlayerTurnGeo;
 
-	// Global Colors
+	// Global Color Materials
 	Material blue, green, red, yellow, white;
 
 	// Find a way to not need this...
@@ -53,6 +54,15 @@ public class Dots extends SimpleApplication {
 	public static void main(String[] args) {
 		Logger.getLogger("").setLevel(Level.SEVERE); // Stop JME3 Outputs
 		Dots app = new Dots();
+		app.setShowSettings(false); // Dont display Splash Window
+		
+		AppSettings appset = new AppSettings(true); // Define Settings of Application
+		appset.setResolution(1024, 800);
+		appset.setTitle("DOTS, 3D by John Spaetzel");
+		appset.setRenderer(AppSettings.LWJGL_OPENGL_ANY);
+		appset.setVSync(true);
+		app.setSettings(appset);
+		
 		app.start();
 	}
 
@@ -332,10 +342,10 @@ public class Dots extends SimpleApplication {
 	 */
 	private static boolean LineExist(Vector3f a, Vector3f b, Vector3f[][] Lines, int LineCount) {
 		for ( int i = 0; i < LineCount; i++ ) {
-			if ( Vector3fMath.compareVectors(Lines[i][0], a) && Vector3fMath.compareVectors(Lines[i][1], b) ) {
+			if ( Vector3fMath.equalVectors(Lines[i][0], a) && Vector3fMath.equalVectors(Lines[i][1], b) ) {
 				return true;
 			}
-			if ( Vector3fMath.compareVectors(Lines[i][0], b) && Vector3fMath.compareVectors(Lines[i][1], a) ) {
+			if ( Vector3fMath.equalVectors(Lines[i][0], b) && Vector3fMath.equalVectors(Lines[i][1], a) ) {
 				return true;
 			}
 		}
