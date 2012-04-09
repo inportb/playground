@@ -88,7 +88,7 @@ class MemeGen(callbacks.Plugin):
 	#connect to ftp
 	ftp = FTP('69.175.4.118')
 	ftp.set_pasv('true')
-	ftp.login('zzbomb','geeks4ever') 
+	ftp.login('zzbomb','') 
 	ftp.cwd('public_html/memegen') # change directory where to store the image, on server
 	F=open(tempfile,'r')
 	
